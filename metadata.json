@@ -1,0 +1,5 @@
+{
+  "name": "Whop Course Analyzer",
+  "description": "An application for Whop.com users to analyze their course text. Users can paste their course content, and the app will generate the 5 best keywords and suggest 3 relevant Whop categories to optimize their listing.",
+  "requestFramePermissions": []
+}

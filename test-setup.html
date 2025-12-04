@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Whop Test Setup</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: white;
+        }
+        input, button {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border: 1px solid #444;
+            background: #2a2a2a;
+            color: white;
+        }
+        button {
+            background: #4f46e5;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #4338ca;
+        }
+    </style>
+</head>
+<body>
+    <h1>Whop Access Token Setup</h1>
+    <p>Enter your Whop access token to test the integration:</p>
+    
+    <input type="text" id="tokenInput" placeholder="Enter your Whop access token">
+    <button onclick="saveToken()">Save Token & Open App</button>
+    
+    <div id="status" style="margin-top: 20px;"></div>
+    
+    <script>
+        function saveToken() {
+            const token = document.getElementById('tokenInput').value;
+            if (!token) {
+                alert('Please enter a token');
+                return;
+            }
+            
+            localStorage.setItem('whop_access_token', token);
+            document.getElementById('status').innerHTML = 
+                '<p style="color: #10b981;">✓ Token saved!</p>' +
+                '<p>Token has been saved to localStorage. You can now use the app.</p>';
+        }
+    </script>
+</body>
+</html>

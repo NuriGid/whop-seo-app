@@ -1,0 +1,7 @@
+{
+  "name": "whop-course-analyzer",
+  "description": "Analyze Whop course content and extract key information",
+  "version": "0.1.0",
+  "author": "NuriGid",
+  "license": "MIT"
+}
