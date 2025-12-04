@@ -1,12 +1,12 @@
 
 import { AnalysisResult } from "../types";
 
-// Backend'e istek at - Artık Google API'ye direkt gitmiyor
+// Backend'e istek at - Vercel serverless function kullanıyor
 export async function analyzeCourseText(text: string): Promise<AnalysisResult> {
   console.log('🚀 Sending analysis request to backend...');
   
   try {
-    const response = await fetch('http://localhost:3001/api/analyze', {
+    const response = await fetch('/api/analyze', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
