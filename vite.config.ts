@@ -5,10 +5,7 @@ import react from '@vitejs/plugin-react';
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
     return {
-      server: {
-        port: 5173,
-        host: '0.0.0.0',
-      },
+      // Sadece plugins ve define kalmalı, server bloku gitti
       plugins: [react()],
       define: {
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
