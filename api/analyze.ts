@@ -31,8 +31,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     
     console.log("⚡️ Gemini 1.5 Flash ile analiz basliyor...");
     
-    // Model ismi güncellendi: gemini-1.5-flash-latest
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
+    // Model ismi güncellendi: gemini-1.5-flash-001
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-001:generateContent?key=${GEMINI_API_KEY}`;
 
     const aiResponse = await fetch(url, {
       method: 'POST',
