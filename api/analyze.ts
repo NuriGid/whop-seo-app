@@ -1,10 +1,10 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-// API Key kontrolü ve TIRAŞLAMA (Trim) - Boşlukları temizler
+// API Key kontrolü ve TIRAŞLAMA
 const GEMINI_API_KEY = (process.env.GEMINI_API_KEY || '').trim();
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // 1. CORS Ayarları
+  // CORS Ayarları
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
@@ -29,10 +29,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const { prompt } = req.body;
     
-    console.log("⚡️ Gemini 1.5 Flash ile analiz basliyor...");
+    // BURASI DEĞİŞTİ: En eski ve en kararlı model (Gemini Pro 1.0)
+    // Flash veya Experimental sürümleri hata veriyorsa, bu çalışır.
+    console.log("⚡️ Gemini Pro (Klasik) ile analiz basliyor...");
     
-    // Model: gemini-1.5-flash
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`;
 
     const aiResponse = await fetch(url, {
       method: 'POST',
