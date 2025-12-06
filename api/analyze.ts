@@ -33,7 +33,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Yedekli model stratejisi
     const modelsToTry = [
-      'gemini-2.0-flash-exp',
+      'gemini-1.5-flash',
       'gemini-1.5-flash',
       'gemini-1.5-pro'
     ];
