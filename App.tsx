@@ -33,15 +33,23 @@ const App: React.FC = () => {
   useEffect(() => {
     const fetchProducts = async () => {
       try {
+        console.log('🔍 Fetching products from /api/products...');
         const response = await fetch('/api/products');
+        
+        console.log('📡 Response status:', response.status);
+        console.log('📡 Response OK:', response.ok);
 
         if (!response.ok) {
-          throw new Error(`Failed to fetch products: ${response.statusText}`);
+          const errorText = await response.text();
+          console.error('❌ API Error Response:', errorText);
+          throw new Error(`Failed to fetch products: ${response.status} - ${errorText}`);
         }
 
         const data = await response.json();
+        console.log('✅ Products data:', data);
         setProducts(data.data || data);
       } catch (err) {
+        console.error('💥 Fetch error:', err);
         if (err instanceof Error) {
           setError(`Error loading courses: ${err.message}`);
         } else {
