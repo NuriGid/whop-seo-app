@@ -7,6 +7,7 @@ export interface AnalysisResult {
 export interface WhopProduct {
   id: string;
   name: string;
+  title?: string;
   description?: string;
   visibility?: string;
   created_at?: number;
