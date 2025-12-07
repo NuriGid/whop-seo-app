@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-// API Key kontrolü ve TIRAŞLAMA
-const GEMINI_API_KEY = (process.env.GEMINI_API_KEY || '').trim();
+// Groq API Key kontrolü
+const GROQ_API_KEY = (process.env.GROQ_API_KEY || '').trim();
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS Ayarları
@@ -23,27 +23,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    if (!GEMINI_API_KEY) {
-      throw new Error('Vercel ayarlarinda GEMINI_API_KEY eksik!');
+    if (!GROQ_API_KEY) {
+      throw new Error('Vercel ayarlarinda GROQ_API_KEY eksik! Lütfen console.groq.com adresinden alin.');
     }
 
     const { prompt } = req.body;
     
-    // BURASI DEĞİŞTİ: En eski ve en kararlı model (Gemini Pro 1.0)
-    // Flash veya Experimental sürümleri hata veriyorsa, bu çalışır.
-    console.log("⚡️ Gemini Pro (Klasik) ile analiz basliyor...");
+    // Groq üzerinde çalışan en güçlü ve dengeli model: Llama 3 70B
+    const model = 'llama3-70b-8192';
+
+    console.log(`⚡️ Groq (${model}) ile analiz basliyor...`);
     
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`;
-
-    const aiResponse = await fetch(url, {
+    // Groq OpenAI uyumlu API kullanır
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Authorization': `Bearer ${GROQ_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
       body: JSON.stringify({
-        contents: [{
-          parts: [{
-            text: `You are an expert in marketing and SEO for online courses on Whop.com.
-
-Analyze this course description and return ONLY valid JSON in this exact format:
+        model: model,
+        messages: [
+          {
+            role: "system",
+            content: "You are an expert in marketing and SEO for online courses on Whop.com. You output ONLY valid JSON."
+          },
+          {
+            role: "user",
+            content: `Analyze this course description and return ONLY valid JSON in this exact format:
 {
   "keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"],
   "categories": ["Category 1", "Category 2", "Category 3"]
@@ -52,23 +59,28 @@ Analyze this course description and return ONLY valid JSON in this exact format:
 Choose categories from: Trading & Investing, E-commerce, Software & Tools, Fitness & Health, Education, Gaming, Crypto & NFTs, Social Media Marketing, Cooking, Music Production
 
 Course Description:
-${prompt}` 
-          }]
-        }]
+${prompt}`
+          }
+        ],
+        temperature: 0.3, // Daha tutarlı sonuçlar için düşük sıcaklık
+        response_format: { type: "json_object" } // Groq'un JSON modu
       })
     });
 
-    if (!aiResponse.ok) {
-      const errData = await aiResponse.json();
-      console.error("Google API Hatasi:", errData);
-      throw new Error(errData.error?.message || `Google Hatasi: ${aiResponse.status}`);
+    if (!response.ok) {
+      const errData = await response.json();
+      console.error("Groq API Hatasi:", errData);
+      throw new Error(errData.error?.message || `Groq Hatasi: ${response.status}`);
     }
 
-    const data = await aiResponse.json();
-    const textAnswer = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    const data = await response.json();
+    const textAnswer = data.choices?.[0]?.message?.content;
     
-    if (!textAnswer) throw new Error("Google boş yanıt döndürdü.");
+    if (!textAnswer) throw new Error("Groq boş yanıt döndürdü.");
 
+    console.log("✅ Groq Yaniti:", textAnswer);
+
+    // JSON temizliği
     const cleanedText = textAnswer.replace(/```json\n?|```\n?/g, '').trim();
     
     return res.status(200).json(JSON.parse(cleanedText));
