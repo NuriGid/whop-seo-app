@@ -29,8 +29,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const { prompt } = req.body;
     
-    // Groq üzerinde çalışan en güçlü ve dengeli model: Llama 3 70B
-    const model = 'llama3-70b-8192';
+    // Groq üzerinde çalışan en güçlü ve dengeli model: Llama 3.3 70B Versatile
+    const model = 'llama-3.3-70b-versatile';
 
     console.log(`⚡️ Groq (${model}) ile analiz basliyor...`);
     
