@@ -29,10 +29,14 @@ export async function analyzeCourseText(text: string): Promise<AnalysisResult> {
     
     // Validation
     if (
-      !result.keywords ||
-      !result.categories ||
-      !Array.isArray(result.keywords) ||
-      !Array.isArray(result.categories)
+      !result.twitterThread ||
+      !result.salesEmail ||
+      !result.instagramPost ||
+      !result.tiktokScript ||
+      typeof result.twitterThread !== 'string' ||
+      typeof result.salesEmail !== 'string' ||
+      typeof result.instagramPost !== 'string' ||
+      typeof result.tiktokScript !== 'string'
     ) {
       throw new Error("Invalid response structure from backend");
     }

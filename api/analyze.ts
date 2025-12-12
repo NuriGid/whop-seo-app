@@ -46,17 +46,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         messages: [
           {
             role: "system",
-            content: "You are an expert in marketing and SEO for online courses on Whop.com. You output ONLY valid JSON."
+            content: "You are an expert content marketing assistant. You create engaging marketing content for online courses. You output ONLY valid JSON."
           },
           {
             role: "user",
-            content: `Analyze this course description and return ONLY valid JSON in this exact format:
+            content: `Create marketing content for this course. Return ONLY valid JSON in this exact format:
 {
-  "keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"],
-  "categories": ["Category 1", "Category 2", "Category 3"]
+  "twitterThread": "A compelling Twitter thread (5-7 tweets) about this course. Separate each tweet with '\n\n---\n\n'. Make it engaging and use relevant hashtags.",
+  "salesEmail": "A persuasive sales email (subject + body) promoting this course. Include a clear call-to-action.",
+  "instagramPost": "An eye-catching Instagram caption with emojis and relevant hashtags. Keep it concise but impactful."
 }
-
-Choose categories from: Trading & Investing, E-commerce, Software & Tools, Fitness & Health, Education, Gaming, Crypto & NFTs, Social Media Marketing, Cooking, Music Production
 
 Course Description:
 ${prompt}`
