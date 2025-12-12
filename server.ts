@@ -37,18 +37,57 @@ app.get('/api/products', async (req, res) => {
     const userTokenHeader = req.headers['x-whop-user-token'];
 
     if (!userTokenHeader || typeof userTokenHeader !== 'string') {
-      return res.status(401).json({ 
-        error: 'Unauthorized',
-        message: 'Missing x-whop-user-token header. This app must be run within Whop Dashboard.',
-        needsAuth: true
+      console.log('⚠️ No x-whop-user-token - Fallback: fetching all products');
+      
+      // Fallback: return all products
+      const response = await fetch('https://api.whop.com/api/v5/company/products', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${WHOP_API_KEY}`,
+          'Content-Type': 'application/json'
+        }
       });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Whop API Error:', errorText);
+        return res.status(response.status).json({
+          error: `Whop API Error: ${response.statusText}`,
+          details: errorText
+        });
+      }
+
+      const productsResponse = await response.json();
+      console.log(`📦 Fallback: Returning ${productsResponse.data?.length || 0} products`);
+      return res.status(200).json({ data: productsResponse.data || [] });
     }
 
     // 2) Get companyId from query params (sent from frontend)
     const { companyId } = req.query;
 
+    // If no companyId, use fallback approach
     if (!companyId || typeof companyId !== 'string') {
-      return res.status(400).json({ error: 'Missing companyId parameter' });
+      console.log('⚠️ No companyId in query - Fallback: fetching all products');
+      
+      const response = await fetch('https://api.whop.com/api/v5/company/products', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${WHOP_API_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        return res.status(response.status).json({
+          error: 'Whop API error',
+          details: errorText,
+        });
+      }
+
+      const data = await response.json();
+      console.log(`📦 Fallback: Returning ${data.data?.length || 0} products`);
+      return res.status(200).json({ data: data.data || [] });
     }
 
     console.log(`🔐 Verifying user token for company: ${companyId}`);
