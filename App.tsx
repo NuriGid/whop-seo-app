@@ -33,9 +33,19 @@ const App: React.FC = () => {
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        console.log('🔍 Fetching products from /api/products...');
+        // Get companyId from URL params (Whop iframe provides this)
+        const urlParams = new URLSearchParams(window.location.search);
+        const companyId = urlParams.get('companyId');
         
-        const response = await fetch('/api/products');
+        console.log('🔍 Fetching products from /api/products...');
+        console.log('🏢 Company ID:', companyId);
+        
+        // Build URL with companyId if available
+        const apiUrl = companyId 
+          ? `/api/products?companyId=${encodeURIComponent(companyId)}`
+          : '/api/products';
+        
+        const response = await fetch(apiUrl);
         
         console.log('📡 Response status:', response.status);
         console.log('📡 Response OK:', response.ok);
