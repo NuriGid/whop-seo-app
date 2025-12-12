@@ -1,7 +1,9 @@
 
 export interface AnalysisResult {
-  keywords: string[];
-  categories: string[];
+  twitterThread: string;
+  salesEmail: string;
+  instagramPost: string;
+  tiktokScript: string;
 }
 
 export interface WhopProduct {
