@@ -10,7 +10,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
   res.setHeader(
     'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, x-company-id'
   );
 
   if (req.method === 'OPTIONS') {
@@ -29,9 +29,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const { prompt } = req.body;
     
-    const model = 'llama-3.3-70b-versatile';
+    // HIZLI MODEL: 70B yerine 8B Instant kullaniyoruz ki Vercel timeout'a düşmesin.
+    const model = 'llama-3.1-8b-instant';
 
-    console.log(`⚡️ Groq (${model}) ile analiz basliyor...`);
+    console.log(`⚡️ Groq (${model}) ile hizli analiz basliyor...`);
     
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -44,7 +45,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         messages: [
           {
             role: "system",
-            content: "You are an expert content marketing assistant. You Output ONLY raw JSON. No markdown, no intro text."
+            content: "You are an expert marketing assistant. You Output ONLY valid JSON. No markdown, no intro text."
           },
           {
             role: "user",
@@ -61,7 +62,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             ${prompt}`
           }
         ],
-        temperature: 0.1, // Daha kesin sonuç için sıcaklığı düşürdük
+        temperature: 0.3, 
         response_format: { type: "json_object" }
       })
     });
@@ -79,9 +80,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.log("✅ Ham Yanit:", textAnswer);
 
-    // --- CERRAHİ TEMİZLİK ---
-    // Cevabın içindeki ilk '{' ve son '}' arasını alıyoruz.
-    // Böylece model "Here is your JSON:" dese bile görmezden geliyoruz.
+    // --- CERRAHİ TEMİZLİK (GELİŞMİŞ) ---
     const firstBrace = textAnswer.indexOf('{');
     const lastBrace = textAnswer.lastIndexOf('}');
 
@@ -90,13 +89,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const cleanJsonString = textAnswer.substring(firstBrace, lastBrace + 1);
-    const parsedData = JSON.parse(cleanJsonString);
     
-    return res.status(200).json(parsedData);
+    try {
+        const parsedData = JSON.parse(cleanJsonString);
+        return res.status(200).json(parsedData);
+    } catch (parseError) {
+        console.error("JSON Parse Hatasi:", parseError);
+        throw new Error("Yapay zeka çıktısı okunamadı (JSON Format Hatası).");
+    }
 
   } catch (error: any) {
     console.error("❌ Analiz Hatasi:", error.message);
-    // Frontend'in anlayacağı formatta hata dön
     return res.status(500).json({ error: error.message || "Analiz sirasinda hata olustu" });
   }
 }
