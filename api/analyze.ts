@@ -24,17 +24,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     if (!GROQ_API_KEY) {
-      throw new Error('Vercel ayarlarinda GROQ_API_KEY eksik! Lütfen console.groq.com adresinden alin.');
+      throw new Error('Vercel ayarlarinda GROQ_API_KEY eksik!');
     }
 
     const { prompt } = req.body;
     
-    // Groq üzerinde çalışan en güçlü ve dengeli model: Llama 3.3 70B Versatile
     const model = 'llama-3.3-70b-versatile';
 
     console.log(`⚡️ Groq (${model}) ile analiz basliyor...`);
     
-    // Groq OpenAI uyumlu API kullanır
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -46,46 +44,59 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         messages: [
           {
             role: "system",
-            content: "You are an expert content marketing assistant. You create engaging marketing content for online courses. You output ONLY valid JSON."
+            content: "You are an expert content marketing assistant. You Output ONLY raw JSON. No markdown, no intro text."
           },
           {
             role: "user",
-            content: `Create marketing content for this course. Return ONLY valid JSON in this exact format:
-{
-  "twitterThread": "A compelling Twitter thread (5-7 tweets) about this course. Separate each tweet with '\n\n---\n\n'. Make it engaging and use relevant hashtags.",
-  "salesEmail": "A persuasive sales email (subject + body) promoting this course. Include a clear call-to-action.",
-  "instagramPost": "An eye-catching Instagram caption with emojis and relevant hashtags. Keep it concise but impactful."
-}
+            content: `Create marketing content for this course.
+            
+            Strictly return JSON format:
+            {
+              "twitterThread": "String with emojis",
+              "salesEmail": "String",
+              "instagramPost": "String"
+            }
 
-Course Description:
-${prompt}`
+            Course Description:
+            ${prompt}`
           }
         ],
-        temperature: 0.3, // Daha tutarlı sonuçlar için düşük sıcaklık
-        response_format: { type: "json_object" } // Groq'un JSON modu
+        temperature: 0.1, // Daha kesin sonuç için sıcaklığı düşürdük
+        response_format: { type: "json_object" }
       })
     });
 
     if (!response.ok) {
       const errData = await response.json();
       console.error("Groq API Hatasi:", errData);
-      throw new Error(errData.error?.message || `Groq Hatasi: ${response.status}`);
+      throw new Error(errData.error?.message || "Groq baglanti hatasi");
     }
 
     const data = await response.json();
     const textAnswer = data.choices?.[0]?.message?.content;
     
-    if (!textAnswer) throw new Error("Groq boş yanıt döndürdü.");
+    if (!textAnswer) throw new Error("Groq bos yanit dondurdu.");
 
-    console.log("✅ Groq Yaniti:", textAnswer);
+    console.log("✅ Ham Yanit:", textAnswer);
 
-    // JSON temizliği
-    const cleanedText = textAnswer.replace(/```json\n?|```\n?/g, '').trim();
+    // --- CERRAHİ TEMİZLİK ---
+    // Cevabın içindeki ilk '{' ve son '}' arasını alıyoruz.
+    // Böylece model "Here is your JSON:" dese bile görmezden geliyoruz.
+    const firstBrace = textAnswer.indexOf('{');
+    const lastBrace = textAnswer.lastIndexOf('}');
+
+    if (firstBrace === -1 || lastBrace === -1) {
+      throw new Error("Yapay zeka geçerli bir JSON üretmedi.");
+    }
+
+    const cleanJsonString = textAnswer.substring(firstBrace, lastBrace + 1);
+    const parsedData = JSON.parse(cleanJsonString);
     
-    return res.status(200).json(JSON.parse(cleanedText));
+    return res.status(200).json(parsedData);
 
   } catch (error: any) {
     console.error("❌ Analiz Hatasi:", error.message);
-    return res.status(500).json({ error: error.message || "Bilinmeyen sunucu hatasi" });
+    // Frontend'in anlayacağı formatta hata dön
+    return res.status(500).json({ error: error.message || "Analiz sirasinda hata olustu" });
   }
 }
