@@ -197,9 +197,33 @@ ${prompt}`
 
     console.log("✅ Groq Response:", textAnswer);
 
+    // Clean response (remove markdown code blocks if present)
     const cleanedText = textAnswer.replace(/```json\n?|```\n?/g, '').trim();
     
-    return res.status(200).json(JSON.parse(cleanedText));
+    let parsedResult;
+    try {
+      parsedResult = JSON.parse(cleanedText);
+    } catch (parseError) {
+      // If JSON parsing fails, try to extract fields manually
+      console.warn('⚠️ JSON parse failed, attempting manual extraction...');
+      console.log('Raw response:', cleanedText);
+      
+      // Check if response is already an object (sometimes Groq returns it directly)
+      if (typeof cleanedText === 'object') {
+        parsedResult = cleanedText;
+      } else {
+        throw new Error('Failed to parse Groq response as JSON');
+      }
+    }
+    
+    // Ensure all required fields exist
+    if (!parsedResult.twitterThread || !parsedResult.salesEmail || 
+        !parsedResult.instagramPost || !parsedResult.tiktokScript) {
+      console.error('❌ Missing required fields in response:', parsedResult);
+      throw new Error('Incomplete response from AI - missing required fields');
+    }
+    
+    return res.status(200).json(parsedResult);
 
   } catch (error: any) {
     console.error("❌ Analysis Error:", error.message);
