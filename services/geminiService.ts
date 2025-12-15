@@ -26,6 +26,12 @@ export async function analyzeCourseText(text: string): Promise<AnalysisResult> {
 
     const result = await response.json();
     console.log('🎉 Analysis complete:', result);
+    console.log('📋 Response type:', typeof result);
+    console.log('🔑 Response keys:', Object.keys(result));
+    console.log('✅ twitterThread:', typeof result.twitterThread, '- exists:', !!result.twitterThread);
+    console.log('✅ salesEmail:', typeof result.salesEmail, '- exists:', !!result.salesEmail);
+    console.log('✅ instagramPost:', typeof result.instagramPost, '- exists:', !!result.instagramPost);
+    console.log('✅ tiktokScript:', typeof result.tiktokScript, '- exists:', !!result.tiktokScript);
     
     // Validation
     if (
@@ -38,6 +44,13 @@ export async function analyzeCourseText(text: string): Promise<AnalysisResult> {
       typeof result.instagramPost !== 'string' ||
       typeof result.tiktokScript !== 'string'
     ) {
+      console.error('❌ VALIDATION FAILED!');
+      console.error('Missing or invalid fields:', {
+        twitterThread: !result.twitterThread || typeof result.twitterThread !== 'string',
+        salesEmail: !result.salesEmail || typeof result.salesEmail !== 'string',
+        instagramPost: !result.instagramPost || typeof result.instagramPost !== 'string',
+        tiktokScript: !result.tiktokScript || typeof result.tiktokScript !== 'string'
+      });
       throw new Error("Invalid response structure from backend");
     }
     
