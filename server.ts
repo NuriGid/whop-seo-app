@@ -163,23 +163,20 @@ app.post('/api/analyze', async (req, res) => {
         messages: [
           {
             role: "system",
-            content: "You are an expert content marketing assistant. You MUST create ALL 4 types of content: Twitter, Email, Instagram, and TikTok. You output ONLY valid JSON with ALL 4 required fields."
+            content: "You are a marketing content generator. Always output valid JSON with exactly 4 fields: twitterThread, salesEmail, instagramPost, tiktokScript. Each field must be a non-empty string."
           },
           {
             role: "user",
-            content: `Create marketing content for this course. You MUST include ALL 4 fields below. Return ONLY valid JSON in this EXACT format:
+            content: `Generate marketing content in JSON format with these 4 fields:
 
 {
-  "twitterThread": "A compelling Twitter thread (5-7 tweets) about this course. Separate each tweet with '\\n\\n---\\n\\n'. Make it engaging and use relevant hashtags.",
-  "salesEmail": "A persuasive sales email (subject + body) promoting this course. Include a clear call-to-action.",
-  "instagramPost": "An eye-catching Instagram caption with emojis and relevant hashtags. Keep it concise but impactful.",
-  "tiktokScript": "A 60-second TikTok video script with: [HOOK] (first 3 seconds to grab attention), [MAIN CONTENT] (key points with trending transitions), [CTA] (strong call-to-action). Include suggested text overlays and trending sounds/music suggestions."
+  "twitterThread": "5 tweet thread about the course (separate tweets with ---)",
+  "salesEmail": "Sales email with subject and body",
+  "instagramPost": "Instagram caption with emojis and hashtags",
+  "tiktokScript": "60-second TikTok script with [HOOK], [CONTENT], [CTA]"
 }
 
-IMPORTANT: You MUST include the tiktokScript field. Do not skip it!
-
-Course Description:
-${prompt}`
+Course: ${prompt}`
           }
         ],
         temperature: 0.3,
