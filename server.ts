@@ -148,7 +148,7 @@ app.post('/api/analyze', async (req, res) => {
     }
 
     const { prompt } = req.body;
-    const model = 'llama-3.3-70b-versatile';
+    const model = 'llama-3.1-8b-instant';
 
     console.log(`⚡️ Starting analysis with Groq (${model})...`);
     
