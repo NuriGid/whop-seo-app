@@ -1,9 +1,4 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-
-// Whop API Key'i
-const WHOP_API_KEY = process.env.WHOP_CLIENT_SECRET || '';
-
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req, res) {
   // CORS İzinleri
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -19,36 +14,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    if (!WHOP_API_KEY) {
-      return res.status(500).json({ 
-        error: 'WHOP_API_KEY (Server) ayarlanmamış.' 
+    // 1. KULLANICI TOKEN'INI AL (Pass-Through Auth)
+    const authHeader = req.headers.authorization;
+    const userToken = Array.isArray(authHeader) ? authHeader[0] : authHeader;
+
+    if (!userToken) {
+      console.error("❌ Hata: İstekte Authorization token yok.");
+      return res.status(401).json({ 
+        error: 'Oturum anahtarı (Token) eksik. Lütfen sayfayı yenileyin.' 
       });
     }
 
-    // 1. GÜVENLİK: Company ID zorunlu (multi-tenancy)
-    const requestedCompanyId = (req.query.companyId as string) || req.headers['x-company-id'];
+    console.log('🔒 Kullanıcı Token ile Whop API sorgulanıyor...');
 
-    console.log(`📚 Whop API'den ürünler çekiliyor... İsteyen Şirket: ${requestedCompanyId || 'Bilinmiyor'}`);
-    
-    // 🔒 CRITICAL SECURITY: Company ID is REQUIRED for multi-tenancy
-    if (!requestedCompanyId) {
-      console.error('❌ SECURITY ERROR: No company ID provided!');
-      return res.status(403).json({
-        error: 'Forbidden: Company ID is required',
-        message: 'Access denied. Please provide a valid company ID.'
-      });
-    }
-
+    // 2. PASS-THROUGH: User token'ı direkt Whop'a ilet
+    // Whop API otomatik olarak sadece o user'ın company'sine ait veriyi döner
     const response = await fetch('https://api.whop.com/api/v5/company/products', {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${WHOP_API_KEY}`,
+        'Authorization': userToken,  // User token'ı olduğu gibi ilet
         'Content-Type': 'application/json'
       }
     });
 
     if (!response.ok) {
       const errorText = await response.text();
+      console.error(`Whop API Hatası (${response.status}):`, errorText);
+      
+      if (response.status === 401) {
+        return res.status(401).json({ 
+          error: 'Yetkisiz erişim. Token geçersiz.' 
+        });
+      }
+      
       return res.status(response.status).json({
         error: `Whop API Hatası: ${response.statusText}`,
         details: errorText
@@ -56,20 +54,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const productsResponse = await response.json();
-    const allProducts = productsResponse.data || [];
     
-    // 2. GÜVENLİK FİLTRESİ: SADECE bu company'nin ürünlerini göster!
-    const filteredProducts = allProducts.filter((p: any) => p.company_id === requestedCompanyId);
+    // 3. Veriyi olduğu gibi dön (Whop zaten filtreledi)
+    return res.status(200).json(productsResponse);
 
-    console.log(`📦 Toplam Ürün: ${allProducts.length} -> ${requestedCompanyId} için Filtrelenen: ${filteredProducts.length}`);
-    
-    // 🔒 SECURITY LOG: Show which company's data is being returned
-    console.log(`✅ Returning ${filteredProducts.length} products for company: ${requestedCompanyId}`);
-    
-    return res.status(200).json({ data: filteredProducts });
-
-  } catch (error: unknown) {
-    // Hata tipini güvenli hale getir
+  } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Bilinmeyen Hata';
     console.error('Sunucu Hatası:', errorMessage);
     

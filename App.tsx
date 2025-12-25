@@ -13,10 +13,9 @@ const App: React.FC = () => {
   const [products, setProducts] = useState<WhopProduct[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<string>('');
   const [loadingProducts, setLoadingProducts] = useState(true);
-  const [isUpdating, setIsUpdating] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
-  // Close dropdown when clicking outside
+  // Close dropdown logic
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
@@ -24,99 +23,69 @@ const App: React.FC = () => {
         setIsDropdownOpen(false);
       }
     };
-
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isDropdownOpen]);
 
-  // Fetch products on mount
+  // Fetch products
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        // Get companyId from URL - Whop embeds it in the PATH, not query params!
-        // Example: https://xxx.apps.whop.com/dashboard/biz_hRcZv2fxhfD0um
-        //                                           ^^^^^^^^^^^^^^^^^^^^^^^
         const urlParams = new URLSearchParams(window.location.search);
-        const pathParts = window.location.pathname.split('/');
         
-        // 🔍 DEBUG: Let's see what Whop actually sends!
-        console.log('🌐 Full URL:', window.location.href);
-        console.log('📏 URL Path:', window.location.pathname);
-        console.log('🗣️ Path parts:', pathParts);
-        console.log('🔑 Query params:', Object.fromEntries(urlParams.entries()));
+        // 1. TOKEN YÖNETİMİ (DÜZELTİLDİ)
+        // Token'ı URL'den yakala
+        let accessToken = urlParams.get('access_token') || urlParams.get('token');
         
-        // Extract company ID from path: /dashboard/biz_xxxxx
-        // Look for path segment starting with 'biz_' or 'comp_'
-        let companyId = pathParts.find(part => part.startsWith('biz_') || part.startsWith('comp_'));
-        
-        // Fallback: try query params if path extraction fails
-        if (!companyId) {
-          companyId = urlParams.get('companyId') 
-                   || urlParams.get('company_id')
-                   || urlParams.get('id')
-                   || urlParams.get('company');
-        }
-        
-        console.log('🏬 Company ID extracted:', companyId);
-        
-        // ⚠️ Show debug info if no company ID found
-        if (!companyId) {
-          const debugInfo = `URL: ${window.location.href}\nPath: ${window.location.pathname}\nParams: ${JSON.stringify(Object.fromEntries(urlParams.entries()), null, 2)}`;
-          alert('⚠️ DEBUG: No Company ID found!\n\n' + debugInfo);
-        }
-        
-        console.log('🔍 Fetching products from /api/products...');
-        console.log('🏢 Company ID:', companyId);
-        
-        // Build URL with companyId if available
-        const apiUrl = companyId 
-          ? `/api/products?companyId=${encodeURIComponent(companyId)}`
-          : '/api/products';
-        
-        // 🔐 Get Whop access token from URL params (Whop iframe provides this)
-        const accessToken = urlParams.get('access_token') 
-                         || urlParams.get('token')
-                         || sessionStorage.getItem('whop_access_token');
-        
-        console.log('🔑 Access Token found:', accessToken ? '✅ Yes' : '❌ No');
-        
-        // 🔒 Build headers with Authorization if token exists
-        const headers: HeadersInit = {
-          'Content-Type': 'application/json',
-        };
-        
+        // Varsa hafızaya at, yoksa hafızadan oku
         if (accessToken) {
-          headers['Authorization'] = `Bearer ${accessToken}`;
-          headers['x-whop-user-token'] = accessToken;  // Whop might expect this
-          console.log('✅ Authorization header added');
+            sessionStorage.setItem('whop_access_token', accessToken);
+            // Temiz bir URL için token'ı gizleyebiliriz ama şimdilik kalsın.
         } else {
-          console.warn('⚠️ No access token found - request may fail!');
+            accessToken = sessionStorage.getItem('whop_access_token');
         }
-        
-        const response = await fetch(apiUrl, {
+
+        if (!accessToken) {
+            console.warn('⚠️ Token bulunamadı! Whop iframe içinde olduğundan emin ol.');
+            setError('Authentication failed. Please open this app inside Whop.');
+            setLoadingProducts(false);
+            return;
+        }
+
+        console.log('✅ Token aktif, Backend sorgulanıyor...');
+
+        // 2. BACKEND İSTEĞİ
+        // Company ID parametresine gerek yok, token yetiyor.
+        const response = await fetch('/api/products', {
           method: 'GET',
-          headers: headers,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}` // Şifreyi gönderiyoruz
+          },
         });
-        
-        console.log('📡 Response status:', response.status);
-        console.log('📡 Response OK:', response.ok);
 
         if (!response.ok) {
           const errorText = await response.text();
-          console.error('❌ API Error Response:', errorText);
-          throw new Error(`Failed to fetch products: ${response.status} - ${errorText}`);
+          
+          // 401 ise token süresi dolmuş olabilir, hafızayı temizle
+          if (response.status === 401) {
+              sessionStorage.removeItem('whop_access_token');
+              throw new Error('Oturum süresi doldu. Lütfen sayfayı yenileyin.');
+          }
+          
+          throw new Error(`Failed to fetch: ${response.status} - ${errorText}`);
         }
 
         const data = await response.json();
-        console.log('✅ Products data:', data);
-        setProducts(data.data || data);
-      } catch (err) {
-        console.error('💥 Fetch error:', err);
-        if (err instanceof Error) {
-          setError(`Error loading courses: ${err.message}`);
-        } else {
-          setError('Failed to load courses from Whop.');
-        }
+        // Whop API yapısına göre data.data veya direkt data olabilir
+        const productList = Array.isArray(data) ? data : (data.data || []);
+        
+        setProducts(productList);
+        console.log(`📦 ${productList.length} ürün yüklendi.`);
+
+      } catch (err: any) {
+        console.error('💥 Hata:', err);
+        setError(err.message || 'Failed to load courses.');
       } finally {
         setLoadingProducts(false);
       }
@@ -127,41 +96,22 @@ const App: React.FC = () => {
 
   const handleProductSelect = (productId: string) => {
     setSelectedProduct(productId);
-    setIsDropdownOpen(false); // Close dropdown after selection
-    setError(null); // Clear any previous errors
+    setIsDropdownOpen(false);
+    setError(null);
     
     const product = products.find(p => p.id === productId);
-    
     if (product) {
-      console.log('📦 Selected product:', product);
-      
       if (product.description && product.description.trim()) {
-        // Description var - kullan
-        console.log('✅ Using product description');
         setCourseText(product.description);
-      } else if (product.title && product.title.trim()) {
-        // Description yok ama title var - title'ı placeholder olarak kullan
-        console.log('⚠️ No description, using title as placeholder');
-        setCourseText(`Course: ${product.title}
-
-Please add a detailed description of this course, including:
-- What students will learn
-- Course features
-- Target audience
-- Key benefits`);
       } else {
-        // Hiçbir şey yok - boş bırak ve uyar
-        console.log('❌ No description or title available');
-        setCourseText('');
-        setError('This product has no description in Whop. Please add a description manually below.');
-        setTimeout(() => setError(null), 5000);
+        setCourseText(`Course: ${product.name || 'Untitled'}\n\nPlease analyze this course...`);
       }
     }
   };
 
   const handleAnalyzeClick = async () => {
     if (!courseText.trim()) {
-      setError('Please enter some course content to analyze.');
+      setError('Please enter some course content.');
       return;
     }
     setIsLoading(true);
@@ -171,60 +121,22 @@ Please add a detailed description of this course, including:
     try {
       const analysisResult = await analyzeCourseText(courseText);
       setResult(analysisResult);
-    } catch (err) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError('An unexpected error occurred.');
-      }
+    } catch (err: any) {
+      setError(err.message || 'Analysis failed.');
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleUpdateProduct = async () => {
-    if (!selectedProduct) {
-      setError('Please select a product!');
-      return;
-    }
-
-    if (!result) {
-      setError('Please generate content first!');
-      return;
-    }
-
-    // Copy all marketing content to clipboard
-    const textToCopy = `🎯 MARKETING CONTENT FOR: ${products.find(p => p.id === selectedProduct)?.name}
-
-📱 TWITTER THREAD:
-${result.twitterThread}
-
-📧 SALES EMAIL:
-${result.salesEmail}
-
-📸 INSTAGRAM POST:
-${result.instagramPost}
-
-🎬 TIKTOK VIDEO SCRIPT:
-${result.tiktokScript}
-
----
-Generated by Content Marketing Assistant`;
+    if (!result) return;
+    const textToCopy = `🎯 MARKETING CONTENT\n\n📱 TWITTER:\n${result.twitter}\n\n📧 EMAIL:\n${result.email}\n\n📸 INSTAGRAM:\n${result.instagram}\n\n🎬 TIKTOK:\n${result.tiktok}`;
 
     try {
       await navigator.clipboard.writeText(textToCopy);
-      alert('✅ All Marketing Content Copied! You can now paste it wherever you need.');
-      console.log('✅ Content copied to clipboard:', textToCopy);
+      alert('✅ Copied to clipboard!');
     } catch (err) {
-      console.error('Clipboard error:', err);
-      // Fallback - Copy with TextArea
-      const textarea = document.createElement('textarea');
-      textarea.value = textToCopy;
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textarea);
-      alert('✅ All Marketing Content Copied! You can now paste it wherever you need.');
+      console.error('Clipboard failed', err);
     }
   };
 
@@ -235,142 +147,72 @@ Generated by Content Marketing Assistant`;
           Content Marketing Assistant
         </h1>
         <p className="text-gray-400 mb-8">
-          Select a course and get AI-powered marketing content for Twitter, Email, and Instagram.
+          Generate Twitter threads, Emails, and TikTok scripts instantly.
         </p>
 
-        <div className="animate-fade-in space-y-6">
-            {/* Custom Course Dropdown */}
-            <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-lg shadow-lg p-6 relative z-50">
-              <label htmlFor="course-select" className="block text-sm font-medium text-gray-300 mb-2">
-                Select a Course
-              </label>
+        <div className="space-y-6">
+            {/* Dropdown */}
+            <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6 relative z-50">
+              <label className="block text-sm font-medium text-gray-300 mb-2">Select a Course</label>
+              
               {loadingProducts ? (
-                <div className="flex items-center justify-center p-4">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-500"></div>
-                  <span className="ml-2 text-gray-400">Loading courses...</span>
-                </div>
+                <div className="text-gray-400">Loading your courses...</div>
               ) : (
                 <div className="relative custom-dropdown">
-                  {/* Dropdown Button */}
                   <button
                     type="button"
                     onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                    disabled={products.length === 0}
-                    className="w-full p-3 bg-gray-900/50 border border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-white flex items-center justify-between hover:bg-gray-900/70 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full p-3 bg-gray-900 border border-gray-600 rounded-xl flex justify-between items-center"
                   >
-                    <div className="flex items-center gap-3">
-                      {/* Book Icon */}
-                      <svg className="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                      </svg>
-                      <span className="text-left text-white">
-                        {selectedProduct 
-                          ? products.find(p => p.id === selectedProduct)?.name || '-- Select a course --'
-                          : '-- Select a course --'
-                        }
-                      </span>
-                    </div>
-                    {/* Chevron Icon */}
-                    <svg 
-                      className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`} 
-                      fill="none" 
-                      stroke="currentColor" 
-                      viewBox="0 0 24 24"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
+                    <span>{products.find(p => p.id === selectedProduct)?.name || '-- Select --'}</span>
+                    <span className="text-gray-400">▼</span>
                   </button>
 
-                  {/* Dropdown Menu */}
-                  {isDropdownOpen && products.length > 0 && (
-                    <div className="absolute z-50 w-full mt-2 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl max-h-60 overflow-y-auto animate-fade-in">
-                      <ul className="py-2">
-                        <li
-                          onClick={() => handleProductSelect('')}
-                          className="px-4 py-3 hover:bg-indigo-600/20 cursor-pointer transition-colors text-gray-400 hover:text-white flex items-center gap-3"
+                  {isDropdownOpen && (
+                    <div className="absolute w-full mt-2 bg-gray-900 border border-gray-700 rounded-xl max-h-60 overflow-y-auto shadow-xl">
+                      {products.map((p) => (
+                        <div
+                          key={p.id}
+                          onClick={() => handleProductSelect(p.id)}
+                          className="p-3 hover:bg-indigo-600/20 cursor-pointer border-b border-gray-800 last:border-0"
                         >
-                          <span>-- Select a course --</span>
-                        </li>
-                        {products.map((product) => (
-                          <li
-                            key={product.id}
-                            onClick={() => handleProductSelect(product.id)}
-                            className={`px-4 py-3 hover:bg-indigo-600/20 cursor-pointer transition-colors flex items-center gap-3 ${
-                              selectedProduct === product.id 
-                                ? 'bg-indigo-600/30 text-white font-semibold' 
-                                : 'text-gray-300 hover:text-white'
-                            }`}
-                          >
-                            <svg className="w-4 h-4 text-indigo-400" fill="currentColor" viewBox="0 0 20 20">
-                              <path d="M9 2a2 2 0 00-2 2v8a2 2 0 002 2h6a2 2 0 002-2V6.414A2 2 0 0016.414 5L14 2.586A2 2 0 0012.586 2H9z" />
-                              <path d="M3 8a2 2 0 012-2v10h8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
-                            </svg>
-                            <span>{product.name}</span>
-                          </li>
-                        ))}
-                      </ul>
+                          {p.name}
+                        </div>
+                      ))}
+                      {products.length === 0 && (
+                        <div className="p-3 text-gray-500">No courses found.</div>
+                      )}
                     </div>
                   )}
                 </div>
               )}
-              {products.length === 0 && !loadingProducts && (
-                <p className="text-sm text-gray-400 mt-2">No courses found. Make sure your access token is configured.</p>
-              )}
             </div>
 
-            <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-lg shadow-lg p-6">
-              <label htmlFor="course-text" className="block text-sm font-medium text-gray-300 mb-2">
-                Course Description {selectedProduct && '(Auto-filled from selected course)'}
-              </label>
+            {/* Input Area */}
+            <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6">
               <textarea
-                id="course-text"
-                className="w-full h-40 p-3 bg-gray-900/50 border border-gray-600 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors placeholder-gray-500"
-                placeholder="Enter your course description, features, and content here..."
+                className="w-full h-40 p-3 bg-gray-900/50 border border-gray-600 rounded-md"
+                placeholder="Course description..."
                 value={courseText}
                 onChange={(e) => setCourseText(e.target.value)}
-                disabled={isLoading}
-                aria-label="Course text input"
               />
-                <button
+              <button
                 onClick={handleAnalyzeClick}
                 disabled={isLoading || !courseText.trim()}
-                className="mt-4 w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-800/50 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-md transition-all duration-300 ease-in-out flex items-center justify-center"
+                className="mt-4 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-md"
               >
-                {isLoading ? 'Generating Content...' : 'Generate Marketing Content'}
+                {isLoading ? 'Generating...' : 'Generate Content'}
               </button>
             </div>
 
-            {error && (
-              <div className="bg-red-500/20 border border-red-500/30 text-red-300 p-4 rounded-lg" role="alert">
-                <p><strong>Error:</strong> {error}</p>
-              </div>
-            )}
+            {error && <div className="text-red-400 bg-red-900/20 p-4 rounded">{error}</div>}
 
-            {isLoading && <Loader />}
-
-            {result && !isLoading && (
+            {result && (
               <>
                 <ResultCard result={result} />
-                <JsonDisplay result={result} />
-                
-                {/* Copy All Content Button */}
-                <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-lg shadow-lg p-6">
-                  <button
-                    onClick={handleUpdateProduct}
-                    disabled={!selectedProduct}
-                    className="w-full bg-green-600 hover:bg-green-700 disabled:bg-green-800/50 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-md transition-all duration-300 ease-in-out flex items-center justify-center"
-                  >
-                    📋 Copy All Marketing Content
-                  </button>
-                  {!selectedProduct && (
-                    <p className="text-sm text-gray-400 mt-2 text-center">
-                      Please select a product above
-                    </p>
-                  )}
-                  <p className="text-xs text-gray-500 mt-3 text-center">
-                    💡 All marketing content will be copied together in a formatted text
-                  </p>
-                </div>
+                <button onClick={handleUpdateProduct} className="w-full bg-green-600 py-3 rounded-md font-bold">
+                  Copy All Content
+                </button>
               </>
             )}
         </div>
