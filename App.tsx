@@ -15,7 +15,7 @@ const App: React.FC = () => {
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
-  // Close dropdown logic
+  // Dropdown kapatma mantığı
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
@@ -27,24 +27,24 @@ const App: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isDropdownOpen]);
 
-  // Fetch products
+  // Ürünleri Çek
   useEffect(() => {
     const fetchProducts = async () => {
       try {
         const urlParams = new URLSearchParams(window.location.search);
         
-        // 1. TOKEN YÖNETİMİ (DÜZELTİLDİ)
+        // 1. TOKEN YÖNETİMİ
         // Token'ı URL'den yakala
         let accessToken = urlParams.get('access_token') || urlParams.get('token');
         
-        // Varsa hafızaya at, yoksa hafızadan oku
+        // Varsa hafızaya at, yoksa hafızadan oku (Sayfa yenileme koruması)
         if (accessToken) {
             sessionStorage.setItem('whop_access_token', accessToken);
-            // Temiz bir URL için token'ı gizleyebiliriz ama şimdilik kalsın.
         } else {
             accessToken = sessionStorage.getItem('whop_access_token');
         }
 
+        // Token yoksa işlemi durdur (Güvenlik)
         if (!accessToken) {
             console.warn('⚠️ Token bulunamadı! Whop iframe içinde olduğundan emin ol.');
             setError('Authentication failed. Please open this app inside Whop.');
@@ -54,13 +54,12 @@ const App: React.FC = () => {
 
         console.log('✅ Token aktif, Backend sorgulanıyor...');
 
-        // 2. BACKEND İSTEĞİ
-        // Company ID parametresine gerek yok, token yetiyor.
+        // 2. BACKEND İSTEĞİ (Pass-through)
         const response = await fetch('/api/products', {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${accessToken}` // Şifreyi gönderiyoruz
+            'Authorization': `Bearer ${accessToken}` // Anahtarı gönderiyoruz
           },
         });
 
@@ -77,7 +76,6 @@ const App: React.FC = () => {
         }
 
         const data = await response.json();
-        // Whop API yapısına göre data.data veya direkt data olabilir
         const productList = Array.isArray(data) ? data : (data.data || []);
         
         setProducts(productList);
