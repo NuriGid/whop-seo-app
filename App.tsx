@@ -35,7 +35,24 @@ const App: React.FC = () => {
       try {
         // Get companyId from URL params (Whop iframe provides this)
         const urlParams = new URLSearchParams(window.location.search);
-        const companyId = urlParams.get('companyId');
+        
+        // 🔍 DEBUG: Let's see what Whop actually sends!
+        console.log('🌐 Full URL:', window.location.href);
+        console.log('🔑 All URL params:', Object.fromEntries(urlParams.entries()));
+        
+        // Try different possible parameter names
+        const companyId = urlParams.get('companyId') 
+                       || urlParams.get('company_id')
+                       || urlParams.get('id')
+                       || urlParams.get('company');
+        
+        console.log('🏬 Company ID found:', companyId);
+        
+        // ⚠️ TEMPORARY: Show alert to debug on Whop Dashboard
+        if (!companyId) {
+          const debugInfo = `URL: ${window.location.href}\n\nParams: ${JSON.stringify(Object.fromEntries(urlParams.entries()), null, 2)}`;
+          alert('⚠️ DEBUG: No Company ID found!\n\n' + debugInfo);
+        }
         
         console.log('🔍 Fetching products from /api/products...');
         console.log('🏢 Company ID:', companyId);
