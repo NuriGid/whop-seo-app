@@ -27,9 +27,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // 1. GÜVENLİK ADIMI: Frontend'den gelen Şirket Numarasını (Company ID) al
-    const requestedCompanyId = req.headers['x-company-id'];
+    // Try query param first (from URL), then header (for flexibility)
+    const requestedCompanyId = (req.query.companyId as string) || req.headers['x-company-id'];
 
     console.log(`📚 Whop API'den ürünler çekiliyor... İsteyen Şirket: ${requestedCompanyId || 'Bilinmiyor'}`);
+    
+    // 🔒 CRITICAL SECURITY: Company ID is REQUIRED for multi-tenancy
+    if (!requestedCompanyId) {
+      console.error('❌ SECURITY ERROR: No company ID provided!');
+      return res.status(403).json({
+        error: 'Forbidden: Company ID is required',
+        message: 'Access denied. Please provide a valid company ID.'
+      });
+    }
 
     const response = await fetch('https://api.whop.com/api/v5/company/products', {
       method: 'GET',
@@ -50,21 +60,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const productsResponse = await response.json();
     const allProducts = productsResponse.data || [];
     
-    // 2. GÜVENLİK FİLTRESİ: 
-    // Eğer bir Şirket Numarası geldiyse, SADECE ona ait ürünleri göster.
-    // Gelmediyse boş liste dön (veya güvenli modda hepsini engelle).
+    // 2. GÜVENLİK FİLTRESİ: SADECE bu company'nin ürünlerini göster!
+    const filteredProducts = allProducts.filter((p: any) => p.company_id === requestedCompanyId);
+
+    console.log(`📦 Toplam Ürün: ${allProducts.length} -> ${requestedCompanyId} için Filtrelenen: ${filteredProducts.length}`);
     
-    let filteredProducts = allProducts;
-
-    if (requestedCompanyId) {
-      filteredProducts = allProducts.filter((p: any) => p.company_id === requestedCompanyId);
-    } else {
-      // Güvenlik için: ID yoksa listeyi gösterme (Whop bunu istiyor)
-      // Ancak test ederken sorun yaşamaman için şimdilik uyarı verip devam ediyoruz.
-      console.warn("⚠️ DİKKAT: Company ID gelmedi! Filtreleme yapılamadı.");
-    }
-
-    console.log(`📦 Toplam Ürün: ${allProducts.length} -> Filtrelenen: ${filteredProducts.length}`);
+    // 🔒 SECURITY LOG: Show which company's data is being returned
+    console.log(`✅ Returning ${filteredProducts.length} products for company: ${requestedCompanyId}`);
     
     return res.status(200).json({ data: filteredProducts });
 
