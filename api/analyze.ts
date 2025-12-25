@@ -1,16 +1,15 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-// Groq API Key kontrolü
 const GROQ_API_KEY = (process.env.GROQ_API_KEY || '').trim();
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // CORS Ayarları
+  // CORS
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
   res.setHeader(
     'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, x-company-id'
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, x-company-id, Authorization'
   );
 
   if (req.method === 'OPTIONS') {
@@ -28,11 +27,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const { prompt } = req.body;
-    
-    // HIZLI MODEL: 70B yerine 8B Instant kullaniyoruz ki Vercel timeout'a düşmesin.
+    // HIZLI MODEL
     const model = 'llama-3.1-8b-instant';
 
-    console.log(`⚡️ Groq (${model}) ile hizli analiz basliyor...`);
+    console.log(`⚡️ Groq (${model}) ile analiz basliyor...`);
     
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -45,17 +43,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         messages: [
           {
             role: "system",
-            content: "You are an expert marketing assistant. You Output ONLY valid JSON. No markdown, no intro text."
+            content: "You are an expert marketing assistant. You Output ONLY valid JSON."
           },
           {
             role: "user",
             content: `Create marketing content for this course.
             
-            Strictly return JSON format:
+            Strictly return JSON format with these EXACT keys:
             {
-              "twitterThread": "String with emojis",
-              "salesEmail": "String",
-              "instagramPost": "String"
+              "twitter": "5 tweets separated by newlines",
+              "email": "Subject and Body",
+              "instagram": "Caption with hashtags",
+              "tiktok": "Short video script"
             }
 
             Course Description:
@@ -69,37 +68,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (!response.ok) {
       const errData = await response.json();
-      console.error("Groq API Hatasi:", errData);
       throw new Error(errData.error?.message || "Groq baglanti hatasi");
     }
 
     const data = await response.json();
-    const textAnswer = data.choices?.[0]?.message?.content;
+    const textAnswer = data.choices?.[0]?.message?.content || "{}";
     
-    if (!textAnswer) throw new Error("Groq bos yanit dondurdu.");
-
     console.log("✅ Ham Yanit:", textAnswer);
 
-    // --- CERRAHİ TEMİZLİK (GELİŞMİŞ) ---
-    const firstBrace = textAnswer.indexOf('{');
-    const lastBrace = textAnswer.lastIndexOf('}');
-
-    if (firstBrace === -1 || lastBrace === -1) {
-      throw new Error("Yapay zeka geçerli bir JSON üretmedi.");
-    }
-
-    const cleanJsonString = textAnswer.substring(firstBrace, lastBrace + 1);
+    // --- CERRAHİ TEMİZLİK ---
+    let parsedData: any = {};
     
     try {
-        const parsedData = JSON.parse(cleanJsonString);
-        return res.status(200).json(parsedData);
-    } catch (parseError) {
-        console.error("JSON Parse Hatasi:", parseError);
-        throw new Error("Yapay zeka çıktısı okunamadı (JSON Format Hatası).");
+      const firstBrace = textAnswer.indexOf('{');
+      const lastBrace = textAnswer.lastIndexOf('}');
+      if (firstBrace !== -1 && lastBrace !== -1) {
+        const cleanJsonString = textAnswer.substring(firstBrace, lastBrace + 1);
+        parsedData = JSON.parse(cleanJsonString);
+      }
+    } catch (e) {
+      console.error("JSON Parse Hatasi");
     }
 
+    // --- İSİM DENKLEŞTİRME (Frontend ne bekliyorsa onu veriyoruz) ---
+    const safeResponse = {
+      twitter: parsedData.twitter || parsedData.twitterThread || "Could not generate Twitter content.",
+      email: parsedData.email || parsedData.salesEmail || "Could not generate Email.",
+      instagram: parsedData.instagram || parsedData.instagramPost || "Could not generate Instagram content.",
+      tiktok: parsedData.tiktok || parsedData.tiktokScript || "Could not generate TikTok script."
+    };
+    
+    return res.status(200).json(safeResponse);
+
   } catch (error: any) {
-    console.error("❌ Analiz Hatasi:", error.message);
-    return res.status(500).json({ error: error.message || "Analiz sirasinda hata olustu" });
+    console.error("❌ Hata:", error.message);
+    return res.status(500).json({ error: error.message });
   }
 }
