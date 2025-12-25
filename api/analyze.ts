@@ -22,6 +22,9 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
+    // LOG İMZASI: Kodun güncel olup olmadığını buradan anlarız.
+    console.log("🚀 GÜNCEL KOD DEVREDE: Polymorphic Response Modu v3");
+
     if (!GROQ_API_KEY) {
       throw new Error('Vercel ayarlarinda GROQ_API_KEY eksik!');
     }
