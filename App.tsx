@@ -33,24 +33,35 @@ const App: React.FC = () => {
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        // Get companyId from URL params (Whop iframe provides this)
+        // Get companyId from URL - Whop embeds it in the PATH, not query params!
+        // Example: https://xxx.apps.whop.com/dashboard/biz_hRcZv2fxhfD0um
+        //                                           ^^^^^^^^^^^^^^^^^^^^^^^
         const urlParams = new URLSearchParams(window.location.search);
+        const pathParts = window.location.pathname.split('/');
         
         // 🔍 DEBUG: Let's see what Whop actually sends!
         console.log('🌐 Full URL:', window.location.href);
-        console.log('🔑 All URL params:', Object.fromEntries(urlParams.entries()));
+        console.log('📏 URL Path:', window.location.pathname);
+        console.log('🗣️ Path parts:', pathParts);
+        console.log('🔑 Query params:', Object.fromEntries(urlParams.entries()));
         
-        // Try different possible parameter names
-        const companyId = urlParams.get('companyId') 
-                       || urlParams.get('company_id')
-                       || urlParams.get('id')
-                       || urlParams.get('company');
+        // Extract company ID from path: /dashboard/biz_xxxxx
+        // Look for path segment starting with 'biz_' or 'comp_'
+        let companyId = pathParts.find(part => part.startsWith('biz_') || part.startsWith('comp_'));
         
-        console.log('🏬 Company ID found:', companyId);
-        
-        // ⚠️ TEMPORARY: Show alert to debug on Whop Dashboard
+        // Fallback: try query params if path extraction fails
         if (!companyId) {
-          const debugInfo = `URL: ${window.location.href}\n\nParams: ${JSON.stringify(Object.fromEntries(urlParams.entries()), null, 2)}`;
+          companyId = urlParams.get('companyId') 
+                   || urlParams.get('company_id')
+                   || urlParams.get('id')
+                   || urlParams.get('company');
+        }
+        
+        console.log('🏬 Company ID extracted:', companyId);
+        
+        // ⚠️ Show debug info if no company ID found
+        if (!companyId) {
+          const debugInfo = `URL: ${window.location.href}\nPath: ${window.location.pathname}\nParams: ${JSON.stringify(Object.fromEntries(urlParams.entries()), null, 2)}`;
           alert('⚠️ DEBUG: No Company ID found!\n\n' + debugInfo);
         }
         
