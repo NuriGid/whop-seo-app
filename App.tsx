@@ -73,7 +73,30 @@ const App: React.FC = () => {
           ? `/api/products?companyId=${encodeURIComponent(companyId)}`
           : '/api/products';
         
-        const response = await fetch(apiUrl);
+        // 🔐 Get Whop access token from URL params (Whop iframe provides this)
+        const accessToken = urlParams.get('access_token') 
+                         || urlParams.get('token')
+                         || sessionStorage.getItem('whop_access_token');
+        
+        console.log('🔑 Access Token found:', accessToken ? '✅ Yes' : '❌ No');
+        
+        // 🔒 Build headers with Authorization if token exists
+        const headers: HeadersInit = {
+          'Content-Type': 'application/json',
+        };
+        
+        if (accessToken) {
+          headers['Authorization'] = `Bearer ${accessToken}`;
+          headers['x-whop-user-token'] = accessToken;  // Whop might expect this
+          console.log('✅ Authorization header added');
+        } else {
+          console.warn('⚠️ No access token found - request may fail!');
+        }
+        
+        const response = await fetch(apiUrl, {
+          method: 'GET',
+          headers: headers,
+        });
         
         console.log('📡 Response status:', response.status);
         console.log('📡 Response OK:', response.ok);

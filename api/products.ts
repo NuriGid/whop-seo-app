@@ -1,18 +1,14 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-// Whop API Key'i
-const WHOP_API_KEY = process.env.WHOP_CLIENT_SECRET || '';
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // CORS Ayarları
+  // CORS İzinleri
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
   res.setHeader(
     'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, x-company-id' 
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization'
   );
-  // Not: 'x-company-id' başlığını ekledik, frontend bunu gönderecek.
 
   if (req.method === 'OPTIONS') {
     res.status(200).end();
@@ -20,58 +16,111 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    if (!WHOP_API_KEY) {
-      return res.status(500).json({ 
-        error: 'WHOP_API_KEY (Server) ayarlanmamis.' 
-      });
+    // 1. KULLANICI KİMLİĞİNİ AL (Senin şifren değil!)
+    const userToken = req.headers.authorization;
+
+    if (!userToken) {
+      console.error("❌ Hata: İstekte Authorization token yok.");
+      return res.status(401).json({ error: 'Oturum anahtarı (Token) eksik. Lütfen sayfayı yenileyin.' });
     }
 
-    // 1. GÜVENLİK ADIMI: Frontend'den gelen Şirket Numarasını (Company ID) al
-    // Try query param first (from URL), then header (for flexibility)
-    const requestedCompanyId = (req.query.companyId as string) || req.headers['x-company-id'];
+    console.log('🔒 Kullanıcı Tokenı ile Whop API sorgulanıyor...');
 
-    console.log(`📚 Whop API'den ürünler çekiliyor... İsteyen Şirket: ${requestedCompanyId || 'Bilinmiyor'}`);
-    
-    // 🔒 CRITICAL SECURITY: Company ID is REQUIRED for multi-tenancy
-    if (!requestedCompanyId) {
-      console.error('❌ SECURITY ERROR: No company ID provided!');
-      return res.status(403).json({
-        error: 'Forbidden: Company ID is required',
-        message: 'Access denied. Please provide a valid company ID.'
-      });
-    }
-
+    // 2. KÖPRÜ OL (Pass-through): Token'ı direkt Whop'a ilet.
+    // API sadece o token sahibinin verisini döner. İzolasyon %100 sağlanır.
     const response = await fetch('https://api.whop.com/api/v5/company/products', {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${WHOP_API_KEY}`,
+        'Authorization': userToken, // "Bearer ey..." formatında gelir
         'Content-Type': 'application/json'
       }
     });
 
     if (!response.ok) {
       const errorText = await response.text();
+      console.error(`Whop API Hatası (${response.status}):`, errorText);
+      
+      if (response.status === 401) {
+        return res.status(401).json({ error: 'Yetkisiz erişim. Token geçersiz.' });
+      }
+      
       return res.status(response.status).json({
-        error: `Whop API Hatası: ${response.statusText}`,
+        error: `Whop Veri Hatası: ${response.statusText}`,
         details: errorText
       });
     }
 
     const productsResponse = await response.json();
-    const allProducts = productsResponse.data || [];
     
-    // 2. GÜVENLİK FİLTRESİ: SADECE bu company'nin ürünlerini göster!
-    const filteredProducts = allProducts.filter((p: any) => p.company_id === requestedCompanyId);
-
-    console.log(`📦 Toplam Ürün: ${allProducts.length} -> ${requestedCompanyId} için Filtrelenen: ${filteredProducts.length}`);
-    
-    // 🔒 SECURITY LOG: Show which company's data is being returned
-    console.log(`✅ Returning ${filteredProducts.length} products for company: ${requestedCompanyId}`);
-    
-    return res.status(200).json({ data: filteredProducts });
+    // Veriyi olduğu gibi dön.
+    return res.status(200).json(productsResponse);
 
   } catch (error: any) {
-    console.error('Hata:', error);
+    console.error('Sunucu Hatası:', error);
+    return res.status(500).json({ 
+      error: 'Sunucu hatası',
+      message: error.message 
+    });
+  }
+}import type { VercelRequest, VercelResponse } from '@vercel/node';
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // CORS İzinleri
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization'
+  );
+
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+
+  try {
+    // 1. KULLANICI KİMLİĞİNİ AL (Senin şifren değil!)
+    const userToken = req.headers.authorization;
+
+    if (!userToken) {
+      console.error("❌ Hata: İstekte Authorization token yok.");
+      return res.status(401).json({ error: 'Oturum anahtarı (Token) eksik. Lütfen sayfayı yenileyin.' });
+    }
+
+    console.log('🔒 Kullanıcı Tokenı ile Whop API sorgulanıyor...');
+
+    // 2. KÖPRÜ OL (Pass-through): Token'ı direkt Whop'a ilet.
+    // API sadece o token sahibinin verisini döner. İzolasyon %100 sağlanır.
+    const response = await fetch('https://api.whop.com/api/v5/company/products', {
+      method: 'GET',
+      headers: {
+        'Authorization': userToken, // "Bearer ey..." formatında gelir
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Whop API Hatası (${response.status}):`, errorText);
+      
+      if (response.status === 401) {
+        return res.status(401).json({ error: 'Yetkisiz erişim. Token geçersiz.' });
+      }
+      
+      return res.status(response.status).json({
+        error: `Whop Veri Hatası: ${response.statusText}`,
+        details: errorText
+      });
+    }
+
+    const productsResponse = await response.json();
+    
+    // Veriyi olduğu gibi dön.
+    return res.status(200).json(productsResponse);
+
+  } catch (error: any) {
+    console.error('Sunucu Hatası:', error);
     return res.status(500).json({ 
       error: 'Sunucu hatası',
       message: error.message 
