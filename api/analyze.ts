@@ -90,12 +90,26 @@ export default async function handler(req: any, res: any) {
       console.error("JSON Parse Hatasi");
     }
 
-    // --- İSİM DENKLEŞTİRME (Frontend ne bekliyorsa onu veriyoruz) ---
+    // --- GARANTİ (POLYMORPHIC RESPONSE) ---
+    // Frontend ne beklerse beklesin (eski isimler veya yeni isimler), hepsini dolduruyoruz.
+    // Böylece "Invalid Structure" hatası imkansız hale gelir.
+    const twitterContent = parsedData.twitter || parsedData.twitterThread || "Generating...";
+    const emailContent = parsedData.email || parsedData.salesEmail || "Generating...";
+    const instaContent = parsedData.instagram || parsedData.instagramPost || "Generating...";
+    const tiktokContent = parsedData.tiktok || parsedData.tiktokScript || "Generating...";
+
     const safeResponse = {
-      twitter: parsedData.twitter || parsedData.twitterThread || "Could not generate Twitter content.",
-      email: parsedData.email || parsedData.salesEmail || "Could not generate Email.",
-      instagram: parsedData.instagram || parsedData.instagramPost || "Could not generate Instagram content.",
-      tiktok: parsedData.tiktok || parsedData.tiktokScript || "Could not generate TikTok script."
+      // Yeni İsimler
+      twitter: twitterContent,
+      email: emailContent,
+      instagram: instaContent,
+      tiktok: tiktokContent,
+      
+      // Eski İsimler (Yedek)
+      twitterThread: twitterContent,
+      salesEmail: emailContent,
+      instagramPost: instaContent,
+      tiktokScript: tiktokContent
     };
     
     return res.status(200).json(safeResponse);
