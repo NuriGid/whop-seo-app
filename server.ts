@@ -179,7 +179,7 @@ app.post('/api/analyze', async (req, res) => {
 Course: ${prompt}`
           }
         ],
-        temperature: 0.3,
+        temperature: 0.8,  // Higher temperature for more creative and varied content
         response_format: { type: "json_object" }
       })
     });
