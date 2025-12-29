@@ -28,6 +28,26 @@ export default async function handler(req, res) {
       }
     }
 
+    // 🚧 LOCAL DEV MODE: Return mock data for mock token
+    if (userToken && (userToken === 'Bearer mock_token_for_local_dev' || userToken === 'mock_token_for_local_dev')) {
+      console.log('🚧 DEV MODE: Using mock data');
+      return res.status(200).json({
+        company_id: 'mock_company_123',
+        products: [
+          {
+            id: 'prod_mock_1',
+            name: 'Sample Course 1',
+            description: 'This is a sample course for local development testing.'
+          },
+          {
+            id: 'prod_mock_2',
+            name: 'Sample Course 2',
+            description: 'Another sample course with more content for testing.'
+          }
+        ]
+      });
+    }
+
     // 3️⃣ Production: NO token = hard fail
     if (!userToken) {
       console.error('❌ AUTH_REQUIRED: No token provided');

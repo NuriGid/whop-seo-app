@@ -63,7 +63,7 @@ app.get('/api/products', async (req, res) => {
     }
 
     // 2) Get companyId from query params (sent from frontend)
-    const { companyId } = req.query;
+    const companyId = req.query.companyId as string | undefined;
 
     // If no companyId, use fallback approach
     if (!companyId || typeof companyId !== 'string') {
@@ -152,7 +152,8 @@ app.post('/api/analyze', async (req, res) => {
     
     // 2️⃣ Development fallback: allow query param token
     if (!userToken && isDev) {
-      userToken = req.query.token;
+      const queryToken = req.query.token;
+      userToken = typeof queryToken === 'string' ? queryToken : undefined;
       if (userToken) {
         console.log('🚧 DEV MODE: Using token from query param');
       }
