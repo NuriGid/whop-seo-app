@@ -4,6 +4,22 @@
 
 # Whop Course Analyzer
 
+## 🔒 Authentication Checklist (IMPORTANT!)
+
+**Production (Whop App Store):**
+- ☑️ Token required via Whop SDK (`window.Whop.getAccessToken()`)
+- ☑️ No token = App locked (shows "open inside Whop" banner)
+- ☑️ All UI disabled without authentication
+- ☑️ Backend rejects requests without `Authorization` header
+- ☑️ NO fallback to URL params or manual test mode
+
+**Development (Local Testing):**
+- ☑️ Whop SDK token (if available)
+- ☑️ Fallback to URL param `?token=xxx` allowed
+- ☑️ Set `NODE_ENV=development` for testing
+
+---
+
 This tool analyzes Whop course content and extracts key information like course structure, lessons, and metadata.
 
 ## Features

@@ -2,15 +2,23 @@
 import { AnalysisResult } from "../types";
 
 // Backend'e istek at - Vercel serverless function kullanıyor
-export async function analyzeCourseText(text: string): Promise<AnalysisResult> {
+export async function analyzeCourseText(text: string, authToken?: string): Promise<AnalysisResult> {
   console.log('🚀 Sending analysis request to backend...');
   
   try {
+    // 🔐 Build headers with auth token if available
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (authToken) {
+      headers['Authorization'] = `Bearer ${authToken}`;
+      console.log('🔒 Auth token included in request');
+    }
+    
     const response = await fetch('/api/analyze', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify({
         prompt: text
       })

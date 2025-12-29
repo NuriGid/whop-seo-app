@@ -13,13 +13,27 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 1️⃣ USER TOKEN
-    const authHeader = req.headers.authorization;
-    const userToken = Array.isArray(authHeader) ? authHeader[0] : authHeader;
+    // 🔐 STRICT AUTH ENFORCEMENT
+    const isDev = process.env.NODE_ENV === 'development';
+    
+    // 1️⃣ Get token from Authorization header (preferred)
+    let userToken = req.headers.authorization;
+    if (Array.isArray(userToken)) userToken = userToken[0];
+    
+    // 2️⃣ Development fallback: allow query param token
+    if (!userToken && isDev) {
+      userToken = req.query.token;
+      if (userToken) {
+        console.log('🚧 DEV MODE: Using token from query param');
+      }
+    }
 
+    // 3️⃣ Production: NO token = hard fail
     if (!userToken) {
+      console.error('❌ AUTH_REQUIRED: No token provided');
       return res.status(401).json({
-        error: 'Authorization token missing'
+        error: 'AUTH_REQUIRED',
+        message: 'Authentication token required. Please open this app inside Whop.'
       });
     }
 

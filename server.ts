@@ -143,6 +143,32 @@ app.get('/api/products', async (req, res) => {
 // API Route: Analyze Content
 app.post('/api/analyze', async (req, res) => {
   try {
+    // 🔐 STRICT AUTH ENFORCEMENT
+    const isDev = process.env.NODE_ENV === 'development';
+    
+    // 1️⃣ Get token from Authorization header (preferred)
+    let userToken = req.headers.authorization;
+    if (Array.isArray(userToken)) userToken = userToken[0];
+    
+    // 2️⃣ Development fallback: allow query param token
+    if (!userToken && isDev) {
+      userToken = req.query.token;
+      if (userToken) {
+        console.log('🚧 DEV MODE: Using token from query param');
+      }
+    }
+
+    // 3️⃣ Production: NO token = hard fail
+    if (!userToken) {
+      console.error('❌ AUTH_REQUIRED: No token provided');
+      return res.status(401).json({
+        error: 'AUTH_REQUIRED',
+        message: 'Authentication token required. Please open this app inside Whop.'
+      });
+    }
+    
+    console.log('✅ Authenticated request for analyze');
+    
     if (!GROQ_API_KEY) {
       throw new Error('GROQ_API_KEY is missing in Vercel settings! Please get it from console.groq.com');
     }
