@@ -26,26 +26,24 @@ const App: React.FC = () => {
   useEffect(() => {
     const initWhop = async () => {
       try {
-        // Check if Whop SDK is loaded
-        if (!window.Whop) {
-          console.warn("Whop SDK not loaded");
-          setError("Lütfen uygulamayı Whop panelinden açın (SDK not loaded).");
-          setLoadingProducts(false);
-          return;
-        }
+        let token: string | null = null;
         
-        // Kimliği (Token) al
-        const token = await window.Whop.getAccessToken();
+        // Check if Whop SDK is loaded (production)
+        if (window.Whop) {
+          token = await window.Whop.getAccessToken();
+          console.log("✅ SDK Token alındı.");
+        } else {
+          // Local development mode - use mock token
+          console.warn("⚠️ Local development mode - SDK not loaded");
+          token = "mock_token_for_local_dev";
+        }
         
         if (!token) {
-          console.warn("SDK Token vermedi.");
-          // Local test için hata basma, ama Production için uyar
-          setError("Lütfen uygulamayı Whop panelinden açın (Authentication Required).");
+          setError("Authentication failed. Please open from Whop dashboard.");
           setLoadingProducts(false);
           return;
         }
         
-        console.log("✅ SDK Token alındı.");
         // Ürünleri bu token ile çek
         await fetchProducts(token);
         
