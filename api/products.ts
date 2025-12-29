@@ -20,6 +20,10 @@ export default async function handler(req, res) {
     let userToken = req.headers.authorization;
     if (Array.isArray(userToken)) userToken = userToken[0];
     
+    // DEBUG LOGS
+    console.log('Authorization header:', req.headers.authorization);
+    console.log('Parsed token:', userToken);
+    
     // 2️⃣ Development fallback: allow query param token
     if (!userToken && isDev) {
       userToken = req.query.token;
