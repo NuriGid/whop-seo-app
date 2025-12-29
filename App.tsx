@@ -22,7 +22,7 @@ const App: React.FC = () => {
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
-  // 1. GÜVENLİ GİRİŞ (Whop SDK)
+  // 1. SECURE LOGIN (Whop SDK)
   useEffect(() => {
     const initWhop = async () => {
       try {
@@ -57,7 +57,7 @@ const App: React.FC = () => {
     initWhop();
   }, []);
 
-  // 2. ÜRÜNLERİ ÇEKME FONKSİYONU
+  // 2. FETCH PRODUCTS FUNCTION
   const fetchProducts = async (token: string) => {
     try {
       const response = await fetch('/api/products', {
@@ -69,33 +69,35 @@ const App: React.FC = () => {
       });
 
       if (!response.ok) {
-        if (response.status === 401) throw new Error('Oturum izni yok (401).');
-        throw new Error('Ürünler yüklenemedi.');
+        if (response.status === 401) throw new Error('Session unauthorized (401).');
+        throw new Error('Failed to load products.');
       }
 
       const data = await response.json();
-      const productList = Array.isArray(data) ? data : (data.data || []);
+      console.log('API Response:', data); // Debug log
+      const productList = Array.isArray(data) ? data : (data.products || data.data || []);
       
+      console.log('Product List:', productList); // Debug log
       setProducts(productList);
       // Hata varsa temizle
       setError(null);
 
     } catch (err: any) {
       console.error(err);
-      setError(err.message || 'Ürün listesi alınamadı.');
+      setError(err.message || 'Failed to fetch product list.');
     } finally {
       setLoadingProducts(false);
     }
   };
 
-  // --- DİĞER İŞLEMLER ---
+  // --- OTHER OPERATIONS ---
 
   const handleProductSelect = (productId: string) => {
     setSelectedProduct(productId);
     setIsDropdownOpen(false);
     setError(null);
     const product = products.find(p => p.id === productId);
-    if (product) setCourseText(product.description || `Kurs: ${product.name}`);
+    if (product) setCourseText(product.description || `Course: ${product.name}`);
   };
 
   const handleAnalyzeClick = async () => {
@@ -107,7 +109,7 @@ const App: React.FC = () => {
       const analysisResult = await analyzeCourseText(courseText);
       setResult(analysisResult);
     } catch (err: any) {
-      setError('Analiz hatası: ' + err.message);
+      setError('Analysis error: ' + err.message);
     } finally {
       setIsLoading(false);
     }
@@ -130,7 +132,7 @@ ${result.instagram}
 ${result.tiktok}`;
     try {
       await navigator.clipboard.writeText(textToCopy);
-      alert('✅ Kopyalandı!');
+      alert('✅ Copied!');
     } catch (err) { console.error(err); }
   };
 
@@ -140,16 +142,16 @@ ${result.tiktok}`;
         <h1 className="text-4xl font-bold text-indigo-400 mb-2">Content Marketing Assistant</h1>
         
         <div className="space-y-6 mt-8">
-            {/* KURS SEÇİMİ */}
+            {/* COURSE SELECTION */}
             <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 relative z-50">
-              <label className="block text-sm font-medium text-gray-300 mb-2">Kurs Seçin</label>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Select Course</label>
               
               {loadingProducts ? (
-                <div className="text-gray-400">Bağlanıyor...</div>
+                <div className="text-gray-400">Loading...</div>
               ) : (
                 <div className="relative custom-dropdown">
                   <button onClick={() => setIsDropdownOpen(!isDropdownOpen)} className="w-full p-3 bg-gray-900 border border-gray-600 rounded-xl flex justify-between items-center">
-                    <span>{products.find(p => p.id === selectedProduct)?.name || '-- Seçiniz --'}</span>
+                    <span>{products.find(p => p.id === selectedProduct)?.name || '-- Select --'}</span>
                     <span className="text-gray-400">▼</span>
                   </button>
                   {isDropdownOpen && (
@@ -159,20 +161,20 @@ ${result.tiktok}`;
                           {p.name}
                         </div>
                       ))}
-                      {products.length === 0 && <div className="p-3 text-gray-500">Kurs bulunamadı.</div>}
+                      {products.length === 0 && <div className="p-3 text-gray-500">No courses found.</div>}
                     </div>
                   )}
                 </div>
               )}
             </div>
 
-            {/* İÇERİK GİRİŞİ */}
+            {/* CONTENT INPUT */}
             <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
               <textarea
                 className="w-full h-40 p-3 bg-gray-900 border border-gray-600 rounded-md text-white"
-                placeholder="İçerik..." value={courseText} onChange={(e) => setCourseText(e.target.value)} />
+                placeholder="Content..." value={courseText} onChange={(e) => setCourseText(e.target.value)} />
               <button onClick={handleAnalyzeClick} disabled={isLoading || !courseText.trim()} className="mt-4 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-md">
-                {isLoading ? 'Üretiliyor...' : 'Üret'}
+                {isLoading ? 'Generating...' : 'Generate'}
               </button>
             </div>
 
@@ -181,7 +183,7 @@ ${result.tiktok}`;
             {result && (
               <>
                 <ResultCard result={result} />
-                <button onClick={handleUpdateProduct} className="w-full bg-green-600 py-3 rounded-md font-bold text-white">Kopyala</button>
+                <button onClick={handleUpdateProduct} className="w-full bg-green-600 py-3 rounded-md font-bold text-white">Copy</button>
               </>
             )}
         </div>
