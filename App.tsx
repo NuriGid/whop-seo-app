@@ -4,24 +4,9 @@ import { analyzeCourseText } from './services/geminiService';
 import ResultCard from './components/ResultCard';
 import Loader from './components/Loader';
 
-// Whop SDK types (loaded from script in index.html)
-declare global {
-  interface Window {
-    WhopApp?: {
-      init: () => Promise<{
-        getToken: () => Promise<string>;
-        getCompany: () => Promise<{ id: string; name: string }>;
-        getUser: () => Promise<{ id: string; email: string }>;
-      }>;
-    };
-  }
-}
-
 interface AppState {
   isLoading: boolean;
-  isAuthenticated: boolean;
-  authError: string | null;
-  userToken: string | null;
+  isInWhop: boolean;
   products: WhopProduct[];
   productsError: string | null;
   selectedProduct: WhopProduct | null;
@@ -33,9 +18,7 @@ interface AppState {
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>({
     isLoading: true,
-    isAuthenticated: false,
-    authError: null,
-    userToken: null,
+    isInWhop: false,
     products: [],
     productsError: null,
     selectedProduct: null,
@@ -44,77 +27,57 @@ const App: React.FC = () => {
     analysisError: null,
   });
 
-  // Initialize Whop SDK and get user token
+  // Check if we're in Whop iframe and fetch products
   useEffect(() => {
-    const initWhopSDK = async () => {
-      try {
-        console.log('🔐 Initializing Whop SDK...');
-        
-        if (!window.WhopApp) {
-          throw new Error('Whop SDK not loaded. Please open this app inside Whop.');
-        }
+    const init = async () => {
+      // Check if we're in an iframe (inside Whop)
+      const isInIframe = window !== window.parent;
 
-        const whopApp = await window.WhopApp.init();
-        const token = await whopApp.getToken();
-        
-        if (!token) {
-          throw new Error('Failed to get user token from Whop.');
-        }
-
-        console.log('✅ Whop SDK initialized, token received');
-        
-        setState(prev => ({
-          ...prev,
-          isAuthenticated: true,
-          userToken: token,
-          authError: null,
-        }));
-
-      } catch (error) {
-        console.error('❌ Whop SDK initialization failed:', error);
+      if (!isInIframe) {
         setState(prev => ({
           ...prev,
           isLoading: false,
-          isAuthenticated: false,
-          authError: error instanceof Error ? error.message : 'Authentication failed',
+          isInWhop: false,
+          productsError: 'This app must be opened from within Whop. Please access it through your Whop dashboard.',
         }));
+        return;
       }
-    };
 
-    initWhopSDK();
-  }, []);
-
-  // Fetch products when authenticated
-  useEffect(() => {
-    const fetchProducts = async () => {
-      if (!state.isAuthenticated || !state.userToken) return;
+      setState(prev => ({ ...prev, isInWhop: true }));
 
       try {
-        console.log('📦 Fetching products...');
-        
+        console.log('📦 Fetching products from Whop API...');
+
+        // Whop automatically injects auth headers in iframe requests
+        // We use 'credentials: include' to send cookies
         const response = await fetch('/api/products', {
           method: 'GET',
+          credentials: 'include',
           headers: {
-            'Authorization': `Bearer ${state.userToken}`,
             'Content-Type': 'application/json',
           },
         });
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error || `Failed to fetch products: ${response.status}`);
+
+          if (response.status === 401) {
+            throw new Error('Authentication failed. Please refresh the page or re-open the app from Whop.');
+          }
+
+          throw new Error(errorData.message || errorData.error || `Failed to fetch products: ${response.status}`);
         }
 
         const data = await response.json();
         const products: WhopProduct[] = data.data || [];
-        
+
         console.log(`✅ Loaded ${products.length} products`);
 
         setState(prev => ({
           ...prev,
           isLoading: false,
           products,
-          productsError: products.length === 0 ? null : null,
+          productsError: null,
         }));
 
       } catch (error) {
@@ -128,8 +91,8 @@ const App: React.FC = () => {
       }
     };
 
-    fetchProducts();
-  }, [state.isAuthenticated, state.userToken]);
+    init();
+  }, []);
 
   // Handle product selection
   const handleSelectProduct = useCallback((product: WhopProduct) => {
@@ -143,7 +106,7 @@ const App: React.FC = () => {
 
   // Handle analysis
   const handleAnalyze = useCallback(async () => {
-    if (!state.selectedProduct || !state.userToken) return;
+    if (!state.selectedProduct) return;
 
     setState(prev => ({ ...prev, isAnalyzing: true, analysisError: null }));
 
@@ -153,8 +116,9 @@ const App: React.FC = () => {
         Description: ${state.selectedProduct.description || 'No description available'}
       `.trim();
 
-      const result = await analyzeCourseText(productDescription, state.userToken);
-      
+      // analyzeCourseText will make request with credentials
+      const result = await analyzeCourseText(productDescription);
+
       // Validate result has required fields
       if (!result.twitterThread || !result.salesEmail || !result.instagramPost || !result.tiktokScript) {
         throw new Error('Analysis returned incomplete results. Please try again.');
@@ -174,15 +138,15 @@ const App: React.FC = () => {
         analysisError: error instanceof Error ? error.message : 'Analysis failed',
       }));
     }
-  }, [state.selectedProduct, state.userToken]);
+  }, [state.selectedProduct]);
 
-  // Auth error state
-  if (state.authError) {
+  // Not in Whop iframe error state
+  if (!state.isInWhop && !state.isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="bg-red-900/50 border border-red-700 rounded-lg p-6 max-w-md text-center">
-          <h2 className="text-xl font-semibold text-red-300 mb-2">Authentication Error</h2>
-          <p className="text-gray-300">{state.authError}</p>
+          <h2 className="text-xl font-semibold text-red-300 mb-2">Access Denied</h2>
+          <p className="text-gray-300">{state.productsError}</p>
           <p className="text-gray-400 text-sm mt-4">
             This app must be opened from within Whop.
           </p>
@@ -233,11 +197,10 @@ const App: React.FC = () => {
                 <button
                   key={product.id}
                   onClick={() => handleSelectProduct(product)}
-                  className={`p-4 rounded-lg border transition-all text-left ${
-                    state.selectedProduct?.id === product.id
+                  className={`p-4 rounded-lg border transition-all text-left ${state.selectedProduct?.id === product.id
                       ? 'bg-blue-600/30 border-blue-500'
                       : 'bg-gray-800/50 border-gray-700 hover:border-gray-500'
-                  }`}
+                    }`}
                 >
                   <h3 className="font-semibold text-gray-100 truncate">
                     {product.name || product.title || 'Unnamed Product'}

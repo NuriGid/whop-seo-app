@@ -1,4 +1,32 @@
+import * as cookie from 'cookie';
+
 const GROQ_API_KEY = (process.env.GROQ_API_KEY || '').trim();
+
+// Helper to extract Whop user token from request
+function getWhopToken(req: any): string | null {
+  // 1. Check for Authorization header (fallback for direct API calls)
+  const authHeader = req.headers.authorization;
+  if (authHeader && typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
+    return authHeader.substring(7);
+  }
+
+  // 2. Check for whop_user_token cookie (Whop's iframe injection)
+  const cookieHeader = req.headers.cookie;
+  if (cookieHeader) {
+    const cookies = cookie.parse(cookieHeader);
+    if (cookies.whop_user_token) {
+      return cookies.whop_user_token;
+    }
+  }
+
+  // 3. Check for x-whop-user-token header (alternative Whop pattern)
+  const whopHeader = req.headers['x-whop-user-token'];
+  if (whopHeader && typeof whopHeader === 'string') {
+    return whopHeader;
+  }
+
+  return null;
+}
 
 export default async function handler(req: any, res: any) {
   // CORS
@@ -7,7 +35,7 @@ export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
   res.setHeader(
     'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, x-company-id, Authorization'
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, x-company-id, Authorization, Cookie, x-whop-user-token'
   );
 
   if (req.method === 'OPTIONS') {
@@ -20,22 +48,14 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    // 🔐 STRICT AUTH ENFORCEMENT - NO FALLBACKS
-    const authHeader = req.headers.authorization;
+    // 🔐 Extract Whop user token
+    const token = getWhopToken(req);
 
-    if (!authHeader || typeof authHeader !== 'string') {
-      console.error('❌ AUTH_REQUIRED: No Authorization header');
+    if (!token) {
+      console.error('❌ AUTH_REQUIRED: No Whop token found in cookies or headers');
       return res.status(401).json({
         error: 'AUTH_REQUIRED',
-        message: 'Authorization header is required. Please open this app inside Whop.'
-      });
-    }
-
-    if (!authHeader.startsWith('Bearer ')) {
-      console.error('❌ INVALID_TOKEN: Authorization header must be Bearer token');
-      return res.status(401).json({
-        error: 'INVALID_TOKEN',
-        message: 'Authorization header must be a Bearer token.'
+        message: 'Authentication required. Please open this app inside Whop.'
       });
     }
 

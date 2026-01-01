@@ -1,12 +1,40 @@
 /**
  * Vercel Serverless Function: /api/products
  * 
- * STRICT PASS-THROUGH AUTHENTICATION
- * - Extracts Authorization header from incoming request
- * - Forwards EXACT token to Whop API
+ * WHOP IFRAME PASS-THROUGH AUTHENTICATION
+ * - Extracts whop_user_token from cookies (Whop's injection pattern)
+ * - Falls back to Authorization header if present
+ * - Forwards token to Whop API
  * - Returns 401 if no token provided
- * - NO FALLBACK DATA - NO MOCK DATA
  */
+
+import * as cookie from 'cookie';
+
+// Helper to extract Whop user token from request
+function getWhopToken(req: any): string | null {
+    // 1. Check for Authorization header (fallback for direct API calls)
+    const authHeader = req.headers.authorization;
+    if (authHeader && typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
+        return authHeader.substring(7); // Remove 'Bearer ' prefix
+    }
+
+    // 2. Check for whop_user_token cookie (Whop's iframe injection)
+    const cookieHeader = req.headers.cookie;
+    if (cookieHeader) {
+        const cookies = cookie.parse(cookieHeader);
+        if (cookies.whop_user_token) {
+            return cookies.whop_user_token;
+        }
+    }
+
+    // 3. Check for x-whop-user-token header (alternative Whop pattern)
+    const whopHeader = req.headers['x-whop-user-token'];
+    if (whopHeader && typeof whopHeader === 'string') {
+        return whopHeader;
+    }
+
+    return null;
+}
 
 export default async function handler(req: any, res: any) {
     // CORS headers
@@ -15,7 +43,7 @@ export default async function handler(req: any, res: any) {
     res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
     res.setHeader(
         'Access-Control-Allow-Headers',
-        'Authorization, Content-Type, Accept'
+        'Authorization, Content-Type, Accept, Cookie, x-whop-user-token'
     );
 
     // Handle preflight
@@ -29,38 +57,28 @@ export default async function handler(req: any, res: any) {
     }
 
     try {
-        // 1️⃣ STRICT AUTH: Extract Authorization header
-        const authHeader = req.headers.authorization;
+        // Extract Whop user token
+        const token = getWhopToken(req);
 
-        if (!authHeader || typeof authHeader !== 'string') {
-            console.error('❌ AUTH_REQUIRED: No Authorization header');
+        if (!token) {
+            console.error('❌ AUTH_REQUIRED: No Whop token found in cookies or headers');
             return res.status(401).json({
                 error: 'AUTH_REQUIRED',
-                message: 'Authorization header is required. Please open this app inside Whop.',
-            });
-        }
-
-        // Ensure it's a Bearer token
-        if (!authHeader.startsWith('Bearer ')) {
-            console.error('❌ INVALID_TOKEN: Authorization header must be Bearer token');
-            return res.status(401).json({
-                error: 'INVALID_TOKEN',
-                message: 'Authorization header must be a Bearer token.',
+                message: 'Authentication required. Please open this app inside Whop.',
             });
         }
 
         console.log('🔐 Pass-through auth: forwarding user token to Whop API...');
 
-        // 2️⃣ PASS-THROUGH: Forward EXACT token to Whop API
+        // Forward token to Whop API
         const whopResponse = await fetch('https://api.whop.com/api/v5/company/products', {
             method: 'GET',
             headers: {
-                'Authorization': authHeader, // Forward exact token
+                'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json',
             },
         });
 
-        // 3️⃣ Forward response status and data
         const responseData = await whopResponse.json();
 
         if (!whopResponse.ok) {
@@ -72,8 +90,6 @@ export default async function handler(req: any, res: any) {
         }
 
         console.log(`✅ Products fetched: ${responseData.data?.length || 0} items`);
-
-        // Return Whop API response directly (no transformation)
         return res.status(200).json(responseData);
 
     } catch (error: any) {

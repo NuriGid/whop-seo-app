@@ -1,24 +1,18 @@
 
 import { AnalysisResult } from "../types";
 
-// Backend'e istek at - Vercel serverless function kullanıyor
-export async function analyzeCourseText(text: string, authToken?: string): Promise<AnalysisResult> {
+// Backend request - uses Whop's automatic cookie/header injection
+export async function analyzeCourseText(text: string): Promise<AnalysisResult> {
   console.log('🚀 Sending analysis request to backend...');
 
   try {
-    // 🔐 Build headers with auth token if available
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-    };
-
-    if (authToken) {
-      headers['Authorization'] = `Bearer ${authToken}`;
-      console.log('🔒 Auth token included in request');
-    }
-
+    // Whop automatically injects auth cookies/headers for iframe requests
     const response = await fetch('/api/analyze', {
       method: 'POST',
-      headers,
+      credentials: 'include', // Include cookies for Whop auth
+      headers: {
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({
         prompt: text
       })
