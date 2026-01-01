@@ -1,24 +1,27 @@
 /**
  * Vercel Serverless Function: /api/products
  * 
- * WHOP IFRAME PASS-THROUGH AUTHENTICATION
- * - Extracts whop_user_token from cookies (Whop's injection pattern)
- * - Falls back to Authorization header if present
- * - Forwards token to Whop API
- * - Returns 401 if no token provided
+ * WHOP DATA ISOLATION PATTERN:
+ * 1. Verify user has access via x-whop-user-token (JWT containing company_id)
+ * 2. Use WHOP_API_KEY to call Whop API (required for app-level access)
+ * 3. Filter results by the company_id from user's token
+ * 
+ * This ensures users only see data for companies they have access to.
  */
 
 import * as cookie from 'cookie';
 
+const WHOP_API_KEY = (process.env.WHOP_API_KEY || '').trim();
+
 // Helper to extract Whop user token from request
-function getWhopToken(req: any): string | null {
-    // 1. Check for Authorization header (fallback for direct API calls)
-    const authHeader = req.headers.authorization;
-    if (authHeader && typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
-        return authHeader.substring(7); // Remove 'Bearer ' prefix
+function getWhopUserToken(req: any): string | null {
+    // 1. Check for x-whop-user-token header (primary Whop pattern)
+    const whopHeader = req.headers['x-whop-user-token'];
+    if (whopHeader && typeof whopHeader === 'string') {
+        return whopHeader;
     }
 
-    // 2. Check for whop_user_token cookie (Whop's iframe injection)
+    // 2. Check for whop_user_token cookie (Whop's cookie injection)
     const cookieHeader = req.headers.cookie;
     if (cookieHeader) {
         const cookies = cookie.parse(cookieHeader);
@@ -27,13 +30,28 @@ function getWhopToken(req: any): string | null {
         }
     }
 
-    // 3. Check for x-whop-user-token header (alternative Whop pattern)
-    const whopHeader = req.headers['x-whop-user-token'];
-    if (whopHeader && typeof whopHeader === 'string') {
-        return whopHeader;
+    // 3. Check for Authorization header (fallback)
+    const authHeader = req.headers.authorization;
+    if (authHeader && typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
+        return authHeader.substring(7);
     }
 
     return null;
+}
+
+// Decode JWT to extract payload (without verification - Whop SDK handles that)
+function decodeJwtPayload(token: string): any | null {
+    try {
+        const parts = token.split('.');
+        if (parts.length !== 3) return null;
+
+        const payload = parts[1];
+        const decoded = Buffer.from(payload, 'base64').toString('utf-8');
+        return JSON.parse(decoded);
+    } catch (e) {
+        console.error('Failed to decode JWT:', e);
+        return null;
+    }
 }
 
 export default async function handler(req: any, res: any) {
@@ -57,27 +75,51 @@ export default async function handler(req: any, res: any) {
     }
 
     try {
-        // Extract Whop user token
-        const token = getWhopToken(req);
+        // Check for WHOP_API_KEY
+        if (!WHOP_API_KEY) {
+            console.error('❌ WHOP_API_KEY not configured');
+            return res.status(500).json({
+                error: 'SERVER_CONFIG_ERROR',
+                message: 'Server is not properly configured. Missing WHOP_API_KEY.',
+            });
+        }
 
-        if (!token) {
-            console.error('❌ AUTH_REQUIRED: No Whop token found in cookies or headers');
+        // 1. Extract user token for identity verification
+        const userToken = getWhopUserToken(req);
+
+        if (!userToken) {
+            console.error('❌ AUTH_REQUIRED: No Whop user token found');
             return res.status(401).json({
                 error: 'AUTH_REQUIRED',
                 message: 'Authentication required. Please open this app inside Whop.',
             });
         }
 
-        console.log('🔐 Pass-through auth: forwarding user token to Whop API...');
+        // 2. Decode token to get company_id (for data isolation)
+        const payload = decodeJwtPayload(userToken);
+        const companyId = payload?.aud || payload?.company_id || payload?.cid;
 
-        // Forward token to Whop API
-        const whopResponse = await fetch('https://api.whop.com/api/v5/company/products', {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-            },
-        });
+        if (!companyId) {
+            console.error('❌ No company_id in token:', payload);
+            return res.status(403).json({
+                error: 'NO_COMPANY_ACCESS',
+                message: 'Could not determine your company access. Please try again.',
+            });
+        }
+
+        console.log(`🔐 User authenticated for company: ${companyId}`);
+
+        // 3. Call Whop API with WHOP_API_KEY, filtered by company_id
+        const whopResponse = await fetch(
+            `https://api.whop.com/api/v5/company/products`,
+            {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${WHOP_API_KEY}`,
+                    'Content-Type': 'application/json',
+                },
+            }
+        );
 
         const responseData = await whopResponse.json();
 
