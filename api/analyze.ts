@@ -1,5 +1,3 @@
-// import type { VercelRequest, VercelResponse } from '@vercel/node'; // SİLİNDİ: Hata kaynağı
-
 const GROQ_API_KEY = (process.env.GROQ_API_KEY || '').trim();
 
 export default async function handler(req: any, res: any) {
@@ -18,15 +16,33 @@ export default async function handler(req: any, res: any) {
   }
 
   if (req.method !== 'POST') {
-     return res.status(405).json({ error: 'Sadece POST istegi atilabilir.' });
+    return res.status(405).json({ error: 'Only POST requests allowed.' });
   }
 
   try {
-    // LOG İMZASI: Kodun güncel olup olmadığını buradan anlarız.
-    console.log("🚀 GÜNCEL KOD DEVREDE: Polymorphic Response Modu v3");
+    // 🔐 STRICT AUTH ENFORCEMENT - NO FALLBACKS
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || typeof authHeader !== 'string') {
+      console.error('❌ AUTH_REQUIRED: No Authorization header');
+      return res.status(401).json({
+        error: 'AUTH_REQUIRED',
+        message: 'Authorization header is required. Please open this app inside Whop.'
+      });
+    }
+
+    if (!authHeader.startsWith('Bearer ')) {
+      console.error('❌ INVALID_TOKEN: Authorization header must be Bearer token');
+      return res.status(401).json({
+        error: 'INVALID_TOKEN',
+        message: 'Authorization header must be a Bearer token.'
+      });
+    }
+
+    console.log('✅ Authenticated request for analyze');
 
     if (!GROQ_API_KEY) {
-      throw new Error('Vercel ayarlarinda GROQ_API_KEY eksik!');
+      throw new Error('GROQ_API_KEY is missing in Vercel settings!');
     }
 
     const { prompt } = req.body;
@@ -34,7 +50,7 @@ export default async function handler(req: any, res: any) {
     const model = 'llama-3.1-8b-instant';
 
     console.log(`⚡️ Groq (${model}) ile analiz basliyor...`);
-    
+
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -64,7 +80,7 @@ export default async function handler(req: any, res: any) {
             ${prompt}`
           }
         ],
-        temperature: 0.3, 
+        temperature: 0.3,
         response_format: { type: "json_object" }
       })
     });
@@ -76,12 +92,12 @@ export default async function handler(req: any, res: any) {
 
     const data = await response.json();
     const textAnswer = data.choices?.[0]?.message?.content || "{}";
-    
+
     console.log("✅ Ham Yanit:", textAnswer);
 
     // --- CERRAHİ TEMİZLİK ---
     let parsedData: any = {};
-    
+
     try {
       const firstBrace = textAnswer.indexOf('{');
       const lastBrace = textAnswer.lastIndexOf('}');
@@ -107,14 +123,14 @@ export default async function handler(req: any, res: any) {
       email: emailContent,
       instagram: instaContent,
       tiktok: tiktokContent,
-      
+
       // Eski İsimler (Yedek)
       twitterThread: twitterContent,
       salesEmail: emailContent,
       instagramPost: instaContent,
       tiktokScript: tiktokContent
     };
-    
+
     return res.status(200).json(safeResponse);
 
   } catch (error: any) {

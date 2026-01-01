@@ -1,120 +1,86 @@
-export default async function handler(req, res) {
-  // CORS
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'Authorization, Content-Type'
-  );
+/**
+ * Vercel Serverless Function: /api/products
+ * 
+ * STRICT PASS-THROUGH AUTHENTICATION
+ * - Extracts Authorization header from incoming request
+ * - Forwards EXACT token to Whop API
+ * - Returns 401 if no token provided
+ * - NO FALLBACK DATA - NO MOCK DATA
+ */
 
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-
-  try {
-    // 🔐 STRICT AUTH ENFORCEMENT
-    const isDev = process.env.NODE_ENV === 'development';
-    
-    // 1️⃣ Get token from Authorization header (preferred)
-    let userToken = req.headers.authorization;
-    if (Array.isArray(userToken)) userToken = userToken[0];
-    
-    // DEBUG LOGS
-    console.log('Authorization header:', req.headers.authorization);
-    console.log('Parsed token:', userToken);
-    
-    // 2️⃣ Development fallback: allow query param token
-    if (!userToken && isDev) {
-      userToken = req.query.token;
-      if (userToken) {
-        console.log('🚧 DEV MODE: Using token from query param');
-      }
-    }
-
-    // 🚧 LOCAL DEV MODE: Return mock data for mock token
-    if (userToken && (userToken === 'Bearer mock_token_for_local_dev' || userToken === 'mock_token_for_local_dev')) {
-      console.log('🚧 DEV MODE: Using mock data');
-      return res.status(200).json({
-        company_id: 'mock_company_123',
-        products: [
-          {
-            id: 'prod_mock_1',
-            name: 'Sample Course 1',
-            description: 'This is a sample course for local development testing.'
-          },
-          {
-            id: 'prod_mock_2',
-            name: 'Sample Course 2',
-            description: 'Another sample course with more content for testing.'
-          }
-        ]
-      });
-    }
-
-    // 3️⃣ Production: NO token = hard fail
-    if (!userToken) {
-      console.error('❌ AUTH_REQUIRED: No token provided');
-      return res.status(401).json({
-        error: 'AUTH_REQUIRED',
-        message: 'Authentication token required. Please open this app inside Whop.'
-      });
-    }
-
-    // 2️⃣ USER INFO → ACTIVE COMPANY
-    const meRes = await fetch('https://api.whop.com/api/v5/me', {
-      headers: {
-        Authorization: userToken,
-        'Content-Type': 'application/json'
-      }
-    });
-
-    if (!meRes.ok) {
-      return res.status(401).json({
-        error: 'Failed to fetch user info'
-      });
-    }
-
-    const meData = await meRes.json();
-    const companyId = meData?.active_company_id;
-
-    if (!companyId) {
-      return res.status(400).json({
-        error: 'active_company_id not found'
-      });
-    }
-
-    // 3️⃣ PRODUCTS → COMPANY SCOPED
-    const productsRes = await fetch(
-      `https://api.whop.com/api/v5/company/products?company_id=${companyId}`,
-      {
-        headers: {
-          Authorization: userToken,
-          'Content-Type': 'application/json'
-        }
-      }
+export default async function handler(req: any, res: any) {
+    // CORS headers
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
+    res.setHeader(
+        'Access-Control-Allow-Headers',
+        'Authorization, Content-Type, Accept'
     );
 
-    if (!productsRes.ok) {
-      const txt = await productsRes.text();
-      return res.status(productsRes.status).json({
-        error: 'Failed to fetch products',
-        details: txt
-      });
+    // Handle preflight
+    if (req.method === 'OPTIONS') {
+        res.status(200).end();
+        return;
     }
 
-    const products = await productsRes.json();
+    if (req.method !== 'GET') {
+        return res.status(405).json({ error: 'Method not allowed. Use GET.' });
+    }
 
-    // 4️⃣ SADECE BU COMPANY
-    return res.status(200).json({
-      company_id: companyId,
-      products
-    });
+    try {
+        // 1️⃣ STRICT AUTH: Extract Authorization header
+        const authHeader = req.headers.authorization;
 
-  } catch (err) {
-    console.error('SERVER ERROR:', err);
-    return res.status(500).json({
-      error: 'Internal server error'
-    });
-  }
+        if (!authHeader || typeof authHeader !== 'string') {
+            console.error('❌ AUTH_REQUIRED: No Authorization header');
+            return res.status(401).json({
+                error: 'AUTH_REQUIRED',
+                message: 'Authorization header is required. Please open this app inside Whop.',
+            });
+        }
+
+        // Ensure it's a Bearer token
+        if (!authHeader.startsWith('Bearer ')) {
+            console.error('❌ INVALID_TOKEN: Authorization header must be Bearer token');
+            return res.status(401).json({
+                error: 'INVALID_TOKEN',
+                message: 'Authorization header must be a Bearer token.',
+            });
+        }
+
+        console.log('🔐 Pass-through auth: forwarding user token to Whop API...');
+
+        // 2️⃣ PASS-THROUGH: Forward EXACT token to Whop API
+        const whopResponse = await fetch('https://api.whop.com/api/v5/company/products', {
+            method: 'GET',
+            headers: {
+                'Authorization': authHeader, // Forward exact token
+                'Content-Type': 'application/json',
+            },
+        });
+
+        // 3️⃣ Forward response status and data
+        const responseData = await whopResponse.json();
+
+        if (!whopResponse.ok) {
+            console.error('❌ Whop API error:', whopResponse.status, responseData);
+            return res.status(whopResponse.status).json({
+                error: responseData.error || 'Whop API request failed',
+                message: responseData.message || `Status: ${whopResponse.status}`,
+            });
+        }
+
+        console.log(`✅ Products fetched: ${responseData.data?.length || 0} items`);
+
+        // Return Whop API response directly (no transformation)
+        return res.status(200).json(responseData);
+
+    } catch (error: any) {
+        console.error('❌ Server error:', error);
+        return res.status(500).json({
+            error: 'SERVER_ERROR',
+            message: error?.message || 'Internal server error',
+        });
+    }
 }

@@ -1,7 +1,6 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { whopsdk } from './lib/whop-sdk';
 
 // Load environment variables
 dotenv.config();
@@ -16,120 +15,57 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Whop API configuration
-const WHOP_API_KEY = process.env.WHOP_API_KEY || ''; // For Bearer token (products API)
-const WHOP_CLIENT_ID = process.env.WHOP_CLIENT_ID || '';
-const WHOP_CLIENT_SECRET = process.env.WHOP_CLIENT_SECRET || ''; // For OAuth
-const WHOP_REDIRECT_URI = process.env.WHOP_REDIRECT_URI || '';
+// Environment configuration
 const GROQ_API_KEY = (process.env.GROQ_API_KEY || '').trim();
 
 console.log('✅ Environment check:');
-console.log('   WHOP_CLIENT_ID:', WHOP_CLIENT_ID ? '✓ Set' : '✗ Missing');
-console.log('   WHOP_CLIENT_SECRET:', WHOP_CLIENT_SECRET ? '✓ Set' : '✗ Missing');
-console.log('   WHOP_API_KEY:', WHOP_API_KEY ? '✓ Set' : '✗ Missing');
 console.log('   GROQ_API_KEY:', GROQ_API_KEY ? '✓ Set' : '✗ Missing');
-console.log('   SESSION_SECRET:', process.env.SESSION_SECRET ? '✓ Set' : '✗ Missing');
 
-// API Route: Get Products (Whop iframe pattern with x-whop-user-token)
+// API Route: Get Products (STRICT PASS-THROUGH AUTH)
 app.get('/api/products', async (req, res) => {
   try {
-    // 1) Get user token from Whop iframe header
-    const userTokenHeader = req.headers['x-whop-user-token'];
+    // 🔐 STRICT AUTH: Extract Authorization header
+    const authHeader = req.headers.authorization;
 
-    if (!userTokenHeader || typeof userTokenHeader !== 'string') {
-      console.log('⚠️ No x-whop-user-token - Fallback: fetching all products');
-      
-      // Fallback: return all products
-      const response = await fetch('https://api.whop.com/api/v5/company/products', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${WHOP_API_KEY}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Whop API Error:', errorText);
-        return res.status(response.status).json({
-          error: `Whop API Error: ${response.statusText}`,
-          details: errorText
-        });
-      }
-
-      const productsResponse = await response.json();
-      console.log(`📦 Fallback: Returning ${productsResponse.data?.length || 0} products`);
-      return res.status(200).json({ data: productsResponse.data || [] });
-    }
-
-    // 2) Get companyId from query params (sent from frontend)
-    const companyId = req.query.companyId as string | undefined;
-
-    // If no companyId, use fallback approach
-    if (!companyId || typeof companyId !== 'string') {
-      console.log('⚠️ No companyId in query - Fallback: fetching all products');
-      
-      const response = await fetch('https://api.whop.com/api/v5/company/products', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${WHOP_API_KEY}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        return res.status(response.status).json({
-          error: 'Whop API error',
-          details: errorText,
-        });
-      }
-
-      const data = await response.json();
-      console.log(`📦 Fallback: Returning ${data.data?.length || 0} products`);
-      return res.status(200).json({ data: data.data || [] });
-    }
-
-    console.log(`🔐 Verifying user token for company: ${companyId}`);
-
-    // 3) Verify token and get userId
-    const { userId } = await whopsdk.verifyUserToken(userTokenHeader);
-    console.log(`✅ User verified: ${userId}`);
-
-    // 4) Check if user has admin access to this company
-    const access = await whopsdk.users.checkAccess(companyId, { id: userId });
-
-    if (access.access_level !== 'admin') {
-      return res.status(403).json({ 
-        error: 'Admin access required',
-        message: 'You do not have permission to access this company\'s products' 
+    if (!authHeader || typeof authHeader !== 'string') {
+      console.error('❌ AUTH_REQUIRED: No Authorization header');
+      return res.status(401).json({
+        error: 'AUTH_REQUIRED',
+        message: 'Authorization header is required. Please open this app inside Whop.',
       });
     }
 
-    console.log(`🔒 Admin access confirmed for company: ${companyId}`);
-
-    // 5) Fetch products ONLY for this company
-    const response = await fetch(
-      `https://api.whop.com/api/v5/products?company_id=${companyId}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${WHOP_API_KEY}`,
-        },
-      }
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      return res.status(response.status).json({
-        error: 'Whop API error',
-        details: errorText,
+    if (!authHeader.startsWith('Bearer ')) {
+      console.error('❌ INVALID_TOKEN: Authorization header must be Bearer token');
+      return res.status(401).json({
+        error: 'INVALID_TOKEN',
+        message: 'Authorization header must be a Bearer token.',
       });
     }
 
-    const data = await response.json();
-    console.log(`📦 Returning ${data.data?.length || 0} products for company ${companyId}`);
+    console.log('🔐 Pass-through auth: forwarding user token to Whop API...');
 
-    return res.status(200).json({ data: data.data || [] });
+    // PASS-THROUGH: Forward EXACT token to Whop API
+    const whopResponse = await fetch('https://api.whop.com/api/v5/company/products', {
+      method: 'GET',
+      headers: {
+        'Authorization': authHeader, // Forward exact token
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const responseData = await whopResponse.json();
+
+    if (!whopResponse.ok) {
+      console.error('❌ Whop API error:', whopResponse.status, responseData);
+      return res.status(whopResponse.status).json({
+        error: responseData.error || 'Whop API request failed',
+        message: responseData.message || `Status: ${whopResponse.status}`,
+      });
+    }
+
+    console.log(`✅ Products fetched: ${responseData.data?.length || 0} items`);
+    return res.status(200).json(responseData);
 
   } catch (error: any) {
     console.error('❌ Products API error:', error);
@@ -143,33 +79,27 @@ app.get('/api/products', async (req, res) => {
 // API Route: Analyze Content
 app.post('/api/analyze', async (req, res) => {
   try {
-    // 🔐 STRICT AUTH ENFORCEMENT
-    const isDev = process.env.NODE_ENV === 'development';
-    
-    // 1️⃣ Get token from Authorization header (preferred)
-    let userToken = req.headers.authorization;
-    if (Array.isArray(userToken)) userToken = userToken[0];
-    
-    // 2️⃣ Development fallback: allow query param token
-    if (!userToken && isDev) {
-      const queryToken = req.query.token;
-      userToken = typeof queryToken === 'string' ? queryToken : undefined;
-      if (userToken) {
-        console.log('🚧 DEV MODE: Using token from query param');
-      }
-    }
+    // 🔐 STRICT AUTH ENFORCEMENT - NO FALLBACKS
+    const authHeader = req.headers.authorization;
 
-    // 3️⃣ Production: NO token = hard fail
-    if (!userToken) {
-      console.error('❌ AUTH_REQUIRED: No token provided');
+    if (!authHeader || typeof authHeader !== 'string') {
+      console.error('❌ AUTH_REQUIRED: No Authorization header');
       return res.status(401).json({
         error: 'AUTH_REQUIRED',
-        message: 'Authentication token required. Please open this app inside Whop.'
+        message: 'Authorization header is required. Please open this app inside Whop.',
       });
     }
-    
+
+    if (!authHeader.startsWith('Bearer ')) {
+      console.error('❌ INVALID_TOKEN: Authorization header must be Bearer token');
+      return res.status(401).json({
+        error: 'INVALID_TOKEN',
+        message: 'Authorization header must be a Bearer token.',
+      });
+    }
+
     console.log('✅ Authenticated request for analyze');
-    
+
     if (!GROQ_API_KEY) {
       throw new Error('GROQ_API_KEY is missing in Vercel settings! Please get it from console.groq.com');
     }
@@ -178,7 +108,7 @@ app.post('/api/analyze', async (req, res) => {
     const model = 'llama-3.1-8b-instant';
 
     console.log(`⚡️ Starting analysis with Groq (${model})...`);
-    
+
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -219,51 +149,48 @@ Course: ${prompt}`
 
     const data = await response.json();
     const textAnswer = data.choices?.[0]?.message?.content;
-    
+
     if (!textAnswer) throw new Error("Groq returned empty response.");
 
     console.log("✅ Groq Response:", textAnswer);
 
     // Clean response (remove markdown code blocks if present)
     const cleanedText = textAnswer.replace(/```json\n?|```\n?/g, '').trim();
-    
+
     let parsedResult;
     try {
       parsedResult = JSON.parse(cleanedText);
     } catch (parseError) {
-      // If JSON parsing fails, try to extract fields manually
-      console.warn('⚠️ JSON parse failed, attempting manual extraction...');
-      console.log('Raw response:', cleanedText);
-      
-      // Check if response is already an object (sometimes Groq returns it directly)
-      if (typeof cleanedText === 'object') {
-        parsedResult = cleanedText;
-      } else {
-        throw new Error('Failed to parse Groq response as JSON');
-      }
+      console.error('❌ JSON parse failed:', cleanedText);
+      throw new Error('Failed to parse AI response as JSON. Please try again.');
     }
-    
-    // Ensure all required fields exist - add fallbacks if missing
-    if (!parsedResult.twitterThread) {
-      parsedResult.twitterThread = 'Twitter content generation failed. Please try again.';
-    }
-    if (!parsedResult.salesEmail) {
-      parsedResult.salesEmail = 'Email content generation failed. Please try again.';
-    }
-    if (!parsedResult.instagramPost) {
-      parsedResult.instagramPost = 'Instagram content generation failed. Please try again.';
-    }
-    if (!parsedResult.tiktokScript) {
-      console.warn('⚠️ tiktokScript missing, generating fallback...');
-      parsedResult.tiktokScript = `[HOOK] 🎬 Want to learn more about this amazing course?
 
-[MAIN CONTENT] Discover everything you need to know with our comprehensive guide. Perfect for beginners and experts alike!
+    // Validate all required fields exist - NO FALLBACKS
+    const twitterThread = parsedResult.twitterThread || parsedResult.twitter;
+    const salesEmail = parsedResult.salesEmail || parsedResult.email;
+    const instagramPost = parsedResult.instagramPost || parsedResult.instagram;
+    const tiktokScript = parsedResult.tiktokScript || parsedResult.tiktok;
 
-[CTA] 📲 Click the link in bio to enroll now! #Course #Learning #Education`;
+    if (!twitterThread || !salesEmail || !instagramPost || !tiktokScript) {
+      console.error('❌ Incomplete AI response - missing fields');
+      throw new Error('AI returned incomplete results. Please try again.');
     }
-    
-    console.log('✅ Final response with all fields:', Object.keys(parsedResult));
-    return res.status(200).json(parsedResult);
+
+    const response_data = {
+      // Primary keys (used by frontend)
+      twitterThread,
+      salesEmail,
+      instagramPost,
+      tiktokScript,
+      // Alias keys (for compatibility)
+      twitter: twitterThread,
+      email: salesEmail,
+      instagram: instagramPost,
+      tiktok: tiktokScript,
+    };
+
+    console.log('✅ Analysis complete with all fields');
+    return res.status(200).json(response_data);
 
   } catch (error: any) {
     console.error("❌ Analysis Error:", error.message);

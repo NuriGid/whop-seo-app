@@ -1,192 +1,297 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { WhopProduct, AnalysisResult } from './types';
 import { analyzeCourseText } from './services/geminiService';
-import { AnalysisResult, WhopProduct } from './types';
 import ResultCard from './components/ResultCard';
+import Loader from './components/Loader';
 
-// Declare global Whop SDK type
+// Whop SDK types (loaded from script in index.html)
 declare global {
   interface Window {
-    Whop?: {
-      getAccessToken: () => Promise<string>;
+    WhopApp?: {
+      init: () => Promise<{
+        getToken: () => Promise<string>;
+        getCompany: () => Promise<{ id: string; name: string }>;
+        getUser: () => Promise<{ id: string; email: string }>;
+      }>;
     };
   }
 }
 
-const App: React.FC = () => {
-  const [courseText, setCourseText] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [result, setResult] = useState<AnalysisResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [products, setProducts] = useState<WhopProduct[]>([]);
-  const [selectedProduct, setSelectedProduct] = useState<string>('');
-  const [loadingProducts, setLoadingProducts] = useState(true);
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+interface AppState {
+  isLoading: boolean;
+  isAuthenticated: boolean;
+  authError: string | null;
+  userToken: string | null;
+  products: WhopProduct[];
+  productsError: string | null;
+  selectedProduct: WhopProduct | null;
+  analysisResult: AnalysisResult | null;
+  isAnalyzing: boolean;
+  analysisError: string | null;
+}
 
-  // 1. SECURE LOGIN (Whop SDK)
+const App: React.FC = () => {
+  const [state, setState] = useState<AppState>({
+    isLoading: true,
+    isAuthenticated: false,
+    authError: null,
+    userToken: null,
+    products: [],
+    productsError: null,
+    selectedProduct: null,
+    analysisResult: null,
+    isAnalyzing: false,
+    analysisError: null,
+  });
+
+  // Initialize Whop SDK and get user token
   useEffect(() => {
-    const initWhop = async () => {
+    const initWhopSDK = async () => {
       try {
-        let token: string | null = null;
+        console.log('🔐 Initializing Whop SDK...');
         
-        // Check if Whop SDK is loaded (production)
-        if (window.Whop) {
-          token = await window.Whop.getAccessToken();
-          console.log("✅ SDK Token alındı.");
-        } else {
-          // Local development mode - use mock token
-          console.warn("⚠️ Local development mode - SDK not loaded");
-          token = "mock_token_for_local_dev";
+        if (!window.WhopApp) {
+          throw new Error('Whop SDK not loaded. Please open this app inside Whop.');
         }
+
+        const whopApp = await window.WhopApp.init();
+        const token = await whopApp.getToken();
         
         if (!token) {
-          setError("Authentication failed. Please open from Whop dashboard.");
-          setLoadingProducts(false);
-          return;
+          throw new Error('Failed to get user token from Whop.');
         }
+
+        console.log('✅ Whop SDK initialized, token received');
         
-        // Ürünleri bu token ile çek
-        await fetchProducts(token);
-        
-      } catch (err: any) {
-        console.error("SDK Hatası:", err);
-        setError('Bağlantı hatası: Uygulama Whop ile konuşamıyor.');
-        setLoadingProducts(false);
+        setState(prev => ({
+          ...prev,
+          isAuthenticated: true,
+          userToken: token,
+          authError: null,
+        }));
+
+      } catch (error) {
+        console.error('❌ Whop SDK initialization failed:', error);
+        setState(prev => ({
+          ...prev,
+          isLoading: false,
+          isAuthenticated: false,
+          authError: error instanceof Error ? error.message : 'Authentication failed',
+        }));
       }
     };
 
-    initWhop();
+    initWhopSDK();
   }, []);
 
-  // 2. FETCH PRODUCTS FUNCTION
-  const fetchProducts = async (token: string) => {
-    try {
-      const response = await fetch('/api/products', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` // Anahtarı gönder
-        },
-      });
+  // Fetch products when authenticated
+  useEffect(() => {
+    const fetchProducts = async () => {
+      if (!state.isAuthenticated || !state.userToken) return;
 
-      if (!response.ok) {
-        if (response.status === 401) throw new Error('Session unauthorized (401).');
-        throw new Error('Failed to load products.');
+      try {
+        console.log('📦 Fetching products...');
+        
+        const response = await fetch('/api/products', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${state.userToken}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || `Failed to fetch products: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const products: WhopProduct[] = data.data || [];
+        
+        console.log(`✅ Loaded ${products.length} products`);
+
+        setState(prev => ({
+          ...prev,
+          isLoading: false,
+          products,
+          productsError: products.length === 0 ? null : null,
+        }));
+
+      } catch (error) {
+        console.error('❌ Failed to fetch products:', error);
+        setState(prev => ({
+          ...prev,
+          isLoading: false,
+          products: [],
+          productsError: error instanceof Error ? error.message : 'Failed to load products',
+        }));
+      }
+    };
+
+    fetchProducts();
+  }, [state.isAuthenticated, state.userToken]);
+
+  // Handle product selection
+  const handleSelectProduct = useCallback((product: WhopProduct) => {
+    setState(prev => ({
+      ...prev,
+      selectedProduct: product,
+      analysisResult: null,
+      analysisError: null,
+    }));
+  }, []);
+
+  // Handle analysis
+  const handleAnalyze = useCallback(async () => {
+    if (!state.selectedProduct || !state.userToken) return;
+
+    setState(prev => ({ ...prev, isAnalyzing: true, analysisError: null }));
+
+    try {
+      const productDescription = `
+        Product Name: ${state.selectedProduct.name || state.selectedProduct.title || 'Unknown'}
+        Description: ${state.selectedProduct.description || 'No description available'}
+      `.trim();
+
+      const result = await analyzeCourseText(productDescription, state.userToken);
+      
+      // Validate result has required fields
+      if (!result.twitterThread || !result.salesEmail || !result.instagramPost || !result.tiktokScript) {
+        throw new Error('Analysis returned incomplete results. Please try again.');
       }
 
-      const data = await response.json();
-      console.log('API Response:', data); // Debug log
-      const productList = Array.isArray(data) ? data : (data.products || data.data || []);
-      
-      console.log('Product List:', productList); // Debug log
-      setProducts(productList);
-      // Hata varsa temizle
-      setError(null);
+      setState(prev => ({
+        ...prev,
+        isAnalyzing: false,
+        analysisResult: result,
+      }));
 
-    } catch (err: any) {
-      console.error(err);
-      setError(err.message || 'Failed to fetch product list.');
-    } finally {
-      setLoadingProducts(false);
+    } catch (error) {
+      console.error('❌ Analysis failed:', error);
+      setState(prev => ({
+        ...prev,
+        isAnalyzing: false,
+        analysisError: error instanceof Error ? error.message : 'Analysis failed',
+      }));
     }
-  };
+  }, [state.selectedProduct, state.userToken]);
 
-  // --- OTHER OPERATIONS ---
+  // Auth error state
+  if (state.authError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="bg-red-900/50 border border-red-700 rounded-lg p-6 max-w-md text-center">
+          <h2 className="text-xl font-semibold text-red-300 mb-2">Authentication Error</h2>
+          <p className="text-gray-300">{state.authError}</p>
+          <p className="text-gray-400 text-sm mt-4">
+            This app must be opened from within Whop.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
-  const handleProductSelect = (productId: string) => {
-    setSelectedProduct(productId);
-    setIsDropdownOpen(false);
-    setError(null);
-    const product = products.find(p => p.id === productId);
-    if (product) setCourseText(product.description || `Course: ${product.name}`);
-  };
-
-  const handleAnalyzeClick = async () => {
-    if (!courseText.trim()) return;
-    setIsLoading(true);
-    setResult(null);
-    setError(null);
-    try {
-      const analysisResult = await analyzeCourseText(courseText);
-      setResult(analysisResult);
-    } catch (err: any) {
-      setError('Analysis error: ' + err.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleUpdateProduct = async () => {
-    if (!result) return;
-    const textToCopy = `🎯 İÇERİK
-
-📱 TWITTER:
-${result.twitter}
-
-📧 EMAIL:
-${result.email}
-
-📸 INSTAGRAM:
-${result.instagram}
-
-🎬 TIKTOK:
-${result.tiktok}`;
-    try {
-      await navigator.clipboard.writeText(textToCopy);
-      alert('✅ Copied!');
-    } catch (err) { console.error(err); }
-  };
+  // Loading state
+  if (state.isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader />
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center p-4 sm:p-8 font-sans">
-      <div className="w-full max-w-2xl text-center">
-        <h1 className="text-4xl font-bold text-indigo-400 mb-2">Content Marketing Assistant</h1>
-        
-        <div className="space-y-6 mt-8">
-            {/* COURSE SELECTION */}
-            <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 relative z-50">
-              <label className="block text-sm font-medium text-gray-300 mb-2">Select Course</label>
-              
-              {loadingProducts ? (
-                <div className="text-gray-400">Loading...</div>
-              ) : (
-                <div className="relative custom-dropdown">
-                  <button onClick={() => setIsDropdownOpen(!isDropdownOpen)} className="w-full p-3 bg-gray-900 border border-gray-600 rounded-xl flex justify-between items-center">
-                    <span>{products.find(p => p.id === selectedProduct)?.name || '-- Select --'}</span>
-                    <span className="text-gray-400">▼</span>
-                  </button>
-                  {isDropdownOpen && (
-                    <div className="absolute w-full mt-2 bg-gray-900 border border-gray-700 rounded-xl max-h-60 overflow-y-auto shadow-xl">
-                      {products.map((p) => (
-                        <div key={p.id} onClick={() => handleProductSelect(p.id)} className="p-3 hover:bg-indigo-600/20 cursor-pointer border-b border-gray-800 last:border-0">
-                          {p.name}
-                        </div>
-                      ))}
-                      {products.length === 0 && <div className="p-3 text-gray-500">No courses found.</div>}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+    <div className="min-h-screen bg-gray-900 text-gray-100 p-6">
+      <div className="max-w-4xl mx-auto">
+        <h1 className="text-3xl font-bold text-center mb-8 bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+          Whop Content Marketing Assistant
+        </h1>
 
-            {/* CONTENT INPUT */}
-            <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
-              <textarea
-                className="w-full h-40 p-3 bg-gray-900 border border-gray-600 rounded-md text-white"
-                placeholder="Content..." value={courseText} onChange={(e) => setCourseText(e.target.value)} />
-              <button onClick={handleAnalyzeClick} disabled={isLoading || !courseText.trim()} className="mt-4 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-md">
-                {isLoading ? 'Generating...' : 'Generate'}
+        {/* Products Error */}
+        {state.productsError && (
+          <div className="bg-red-900/50 border border-red-700 rounded-lg p-4 mb-6">
+            <p className="text-red-300">{state.productsError}</p>
+          </div>
+        )}
+
+        {/* No Products */}
+        {!state.productsError && state.products.length === 0 && (
+          <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-8 text-center">
+            <h2 className="text-xl font-semibold text-gray-300 mb-2">No courses found</h2>
+            <p className="text-gray-400">
+              You don't have any products in your Whop company yet.
+            </p>
+          </div>
+        )}
+
+        {/* Products List */}
+        {state.products.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold mb-4">Select a Product to Analyze</h2>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {state.products.map(product => (
+                <button
+                  key={product.id}
+                  onClick={() => handleSelectProduct(product)}
+                  className={`p-4 rounded-lg border transition-all text-left ${
+                    state.selectedProduct?.id === product.id
+                      ? 'bg-blue-600/30 border-blue-500'
+                      : 'bg-gray-800/50 border-gray-700 hover:border-gray-500'
+                  }`}
+                >
+                  <h3 className="font-semibold text-gray-100 truncate">
+                    {product.name || product.title || 'Unnamed Product'}
+                  </h3>
+                  {product.description && (
+                    <p className="text-sm text-gray-400 mt-1 line-clamp-2">
+                      {product.description}
+                    </p>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Selected Product */}
+        {state.selectedProduct && (
+          <div className="mb-8">
+            <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6">
+              <h3 className="text-lg font-semibold mb-2">
+                Selected: {state.selectedProduct.name || state.selectedProduct.title}
+              </h3>
+              <p className="text-gray-400 mb-4">
+                {state.selectedProduct.description || 'No description available'}
+              </p>
+              <button
+                onClick={handleAnalyze}
+                disabled={state.isAnalyzing}
+                className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-lg transition-all"
+              >
+                {state.isAnalyzing ? 'Generating Content...' : 'Generate Marketing Content'}
               </button>
             </div>
+          </div>
+        )}
 
-            {error && <div className="text-red-400 bg-red-900/20 p-4 rounded">{error}</div>}
+        {/* Analysis Loading */}
+        {state.isAnalyzing && (
+          <div className="flex justify-center">
+            <Loader />
+          </div>
+        )}
 
-            {result && (
-              <>
-                <ResultCard result={result} />
-                <button onClick={handleUpdateProduct} className="w-full bg-green-600 py-3 rounded-md font-bold text-white">Copy</button>
-              </>
-            )}
-        </div>
+        {/* Analysis Error */}
+        {state.analysisError && (
+          <div className="bg-red-900/50 border border-red-700 rounded-lg p-4 mb-6">
+            <p className="text-red-300">{state.analysisError}</p>
+          </div>
+        )}
+
+        {/* Analysis Results */}
+        {state.analysisResult && (
+          <ResultCard result={state.analysisResult} />
+        )}
       </div>
     </div>
   );
