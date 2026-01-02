@@ -22,7 +22,7 @@ export default async function handler(req: any, res: any) {
         // 2. PASS-THROUGH (KÖPRÜ)
         // Token'ı direkt Whop'a iletiyoruz. 
         // Whop API, bu token kime aitse SADECE onun verisini döner. Filtreye gerek kalmaz.
-        const response = await fetch('https://api.whop.com/api/v5/company/products', {
+        const response = await fetch('https://api.whop.com/api/v5/company/products?visibility=visible', {
             method: 'GET',
             headers: {
                 'Authorization': userToken,
