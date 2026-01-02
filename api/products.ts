@@ -70,14 +70,15 @@ export default async function handler(req: any, res: any) {
             const name = p.name.trim();
             if (name === '') return false;
 
-            // 🚫 MANUEL FİLTRE: Silinmiş ama API'den gelenler
-            const blacklistedNames = [
+            // 🚫 MANUEL FİLTRE: Silinmiş ama API'den gelenler (Case-insensitive & Partial)
+            const normalizedName = name.toLowerCase();
+            const blacklistedTerms = [
                 'benim uygulamam',
-                'SEO Assistant',
-                'Course Name: Crypto Trading Fu' // Şüpheli?
+                'seo assistant',
+                'crypto trading fu'
             ];
 
-            if (blacklistedNames.includes(name)) {
+            if (blacklistedTerms.some(term => normalizedName.includes(term))) {
                 console.log(`🗑️ Kara liste ürünü gizlendi: ${name}`);
                 return false;
             }
