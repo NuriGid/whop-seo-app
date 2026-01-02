@@ -1,9 +1,14 @@
+// import type { VercelRequest, VercelResponse } from '@vercel/node'; // Bağımlılık hatasını önlemek için kapalı
+
 export default async function handler(req: any, res: any) {
-    // CORS
+    // 1. CORS AYARLARI (Tarayıcı İzni)
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-    res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization, x-whop-user-token');
+    res.setHeader(
+        'Access-Control-Allow-Headers',
+        'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization'
+    );
 
     if (req.method === 'OPTIONS') {
         res.status(200).end();
@@ -11,21 +16,16 @@ export default async function handler(req: any, res: any) {
     }
 
     try {
-        // Token'ı birden fazla yerden ara
-        let userToken = req.headers.authorization;
-
-        // x-whop-user-token header'dan da kontrol et
-        if (!userToken && req.headers['x-whop-user-token']) {
-            userToken = `Bearer ${req.headers['x-whop-user-token']}`;
-        }
+        // 2. KULLANICI TOKEN'INI AL (Admin Şifresi ASLA KULLANILMAZ)
+        const userToken = req.headers.authorization;
 
         if (!userToken) {
-            console.error("❌ Token yok.");
+            console.error("❌ Hata: Token yok.");
             return res.status(401).json({ error: 'Token eksik. Whop üzerinden açın.' });
         }
 
-        console.log("✅ Token bulundu, Whop API'ye istek gönderiliyor...");
-
+        // 3. WHOP API İSTEĞİ (Token ile Pass-Through)
+        // Sadece bu token sahibinin görebileceği ürünleri getirir.
         const response = await fetch('https://api.whop.com/api/v5/company/products', {
             method: 'GET',
             headers: {
@@ -35,18 +35,32 @@ export default async function handler(req: any, res: any) {
         });
 
         if (!response.ok) {
+            // Token süresi dolmuşsa veya geçersizse
             if (response.status === 401) return res.status(401).json({ error: 'Token geçersiz.' });
+
             const errorText = await response.text();
-            console.error("❌ Whop API hatası:", response.status, errorText);
             return res.status(response.status).json({ error: `Whop API Hatası`, details: errorText });
         }
 
         const data = await response.json();
-        console.log("✅ Ürünler alındı:", data.data?.length || 0);
-        return res.status(200).json(data);
+        const allProducts = Array.isArray(data) ? data : (data.data || []);
+
+        // 4. GÜMRÜK (FİLTRELEME)
+        // İsmi olmayan, silinmiş veya bozuk verileri listeden atıyoruz.
+        const cleanProducts = allProducts.filter((p: any) => {
+            // ID'si ve İsmi olmak zorunda
+            if (!p.id || !p.name) return false;
+            // İsmi boşluktan ibaret olmamalı
+            if (p.name.trim() === '') return false;
+            return true;
+        });
+
+        console.log(`📦 Gelen: ${allProducts.length} -> Temizlenen: ${cleanProducts.length}`);
+
+        return res.status(200).json(cleanProducts);
 
     } catch (error: any) {
-        console.error("❌ Sunucu hatası:", error.message);
+        console.error('Sunucu Hatası:', error);
         return res.status(500).json({ error: error.message });
     }
 }
