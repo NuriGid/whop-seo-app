@@ -66,10 +66,17 @@ export default async function handler(req: any, res: any) {
     }
 
     const { prompt } = req.body;
+
+    // Prompt boş veya çok kısaysa varsayılan metin ekle
+    const safePrompt = prompt && prompt.trim().length > 10
+      ? prompt
+      : `A digital product called "${prompt || 'Unknown Product'}"`;
+
     // HIZLI MODEL
     const model = 'llama-3.1-8b-instant';
 
     console.log(`⚡️ Groq (${model}) ile analiz basliyor...`);
+    console.log(`📝 Prompt: ${safePrompt.substring(0, 100)}...`);
 
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -82,40 +89,40 @@ export default async function handler(req: any, res: any) {
         messages: [
           {
             role: "system",
-            content: "You are an expert marketing assistant. You Output ONLY valid JSON."
+            content: "You are an expert marketing assistant. Always respond with valid JSON only. No markdown, no explanation, just JSON."
           },
           {
             role: "user",
-            content: `Create marketing content for this course.
+            content: `Create marketing content for this product/course. Generate creative and engaging content even if the description is short.
             
-            Strictly return JSON format with these EXACT keys:
+            Return ONLY valid JSON with these exact keys:
             {
-              "twitter": "5 tweets separated by newlines",
-              "email": "Subject and Body",
-              "instagram": "Caption with hashtags",
-              "tiktok": "Short video script"
+              "twitter": "5 engaging tweets separated by newlines",
+              "email": "Email with Subject line and Body",
+              "instagram": "Caption with relevant hashtags",
+              "tiktok": "Short engaging video script"
             }
 
-            Course Description:
-            ${prompt}`
+            Product/Course: ${safePrompt}`
           }
         ],
-        temperature: 0.3,
-        response_format: { type: "json_object" }
+        temperature: 0.7,
+        max_tokens: 1500
       })
     });
 
     if (!response.ok) {
       const errData = await response.json();
-      throw new Error(errData.error?.message || "Groq baglanti hatasi");
+      console.error("❌ Groq API hatası:", errData);
+      throw new Error(errData.error?.message || "Groq bağlantı hatası");
     }
 
     const data = await response.json();
     const textAnswer = data.choices?.[0]?.message?.content || "{}";
 
-    console.log("✅ Ham Yanit:", textAnswer);
+    console.log("✅ Ham Yanıt:", textAnswer.substring(0, 200));
 
-    // --- CERRAHİ TEMİZLİK ---
+    // --- JSON PARSE ---
     let parsedData: any = {};
 
     try {
@@ -126,7 +133,14 @@ export default async function handler(req: any, res: any) {
         parsedData = JSON.parse(cleanJsonString);
       }
     } catch (e) {
-      console.error("JSON Parse Hatasi");
+      console.error("❌ JSON Parse Hatası:", e);
+      // Parse başarısızsa varsayılan içerik döndür
+      parsedData = {
+        twitter: "Check out this amazing product! 🚀",
+        email: "Subject: Discover Something New\n\nHello!\n\nWe're excited to share this with you.",
+        instagram: "New product alert! 🎉 #product #new #amazing",
+        tiktok: "Hey! Let me show you something cool..."
+      };
     }
 
     // --- GARANTİ (POLYMORPHIC RESPONSE) ---
