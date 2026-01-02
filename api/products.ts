@@ -26,7 +26,7 @@ export default async function handler(req: any, res: any) {
 
         console.log("✅ Token bulundu, Whop API'ye istek gönderiliyor...");
 
-        const response = await fetch('https://api.whop.com/api/v5/company/products?visibility=not_archived', {
+        const response = await fetch('https://api.whop.com/api/v5/company/products', {
             method: 'GET',
             headers: {
                 'Authorization': userToken,
