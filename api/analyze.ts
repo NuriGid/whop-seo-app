@@ -1,4 +1,13 @@
-import * as cookie from 'cookie';
+// Cookie paketi yerine basit parser (bağımlılık hatası önleme)
+function parseCookies(cookieHeader: string): Record<string, string> {
+  const cookies: Record<string, string> = {};
+  if (!cookieHeader) return cookies;
+  cookieHeader.split(';').forEach(c => {
+    const [key, val] = c.trim().split('=');
+    if (key && val) cookies[key] = decodeURIComponent(val);
+  });
+  return cookies;
+}
 
 const GROQ_API_KEY = (process.env.GROQ_API_KEY || '').trim();
 
@@ -13,7 +22,7 @@ function getWhopToken(req: any): string | null {
   // 2. Check for whop_user_token cookie (Whop's iframe injection)
   const cookieHeader = req.headers.cookie;
   if (cookieHeader) {
-    const cookies = cookie.parse(cookieHeader);
+    const cookies = parseCookies(cookieHeader);
     if (cookies.whop_user_token) {
       return cookies.whop_user_token;
     }
