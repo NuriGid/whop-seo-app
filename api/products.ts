@@ -58,12 +58,24 @@ export default async function handler(req: any, res: any) {
         const cleanProducts = allProducts.filter((p: any) => {
             // İsmi olmayanları at
             if (!p.id || !p.name) return false;
-            if (p.name.trim() === '') return false;
+            const name = p.name.trim();
+            if (name === '') return false;
 
-            // Gelişmiş Filtre: Eğer ürün "archived" veya "hidden" ise gösterme
-            // Whop API genelde 'visibility' alanı döner
-            if (p.visibility === 'hidden' || p.visibility === 'archived') {
-                console.log(`🗑️ Gizli ürün filtrelendi: ${p.name}`);
+            // 🚫 MANUEL FİLTRE: Silinmiş ama API'den gelenler
+            const blacklistedNames = [
+                'benim uygulamam',
+                'SEO Assistant',
+                'Course Name: Crypto Trading Fu' // Şüpheli?
+            ];
+
+            if (blacklistedNames.includes(name)) {
+                console.log(`🗑️ Kara liste ürünü gizlendi: ${name}`);
+                return false;
+            }
+
+            // Gelişmiş Filtre: Whop status kontrolü
+            if (p.visibility === 'hidden' || p.visibility === 'archived' || p.status === 'deleted') {
+                console.log(`🗑️ Gizli/Silinmiş ürün filtrelendi: ${name}`);
                 return false;
             }
 
