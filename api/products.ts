@@ -16,14 +16,23 @@ export default async function handler(req: any, res: any) {
     }
 
     try {
-        // 2. TOKEN AL (Güvenlik)
+        // 2. KULLANICI TOKEN'INI AL (Header + Cookie Kontrolü)
         let userToken = req.headers.authorization || req.headers['x-whop-user-token'];
+
+        // Cookie'den de kontrol et (Safari için kritik)
+        if (!userToken && req.headers.cookie) {
+            const cookieStr = req.headers.cookie;
+            const match = cookieStr.match(/whop_user_token=([^;]+)/);
+            if (match && match[1]) {
+                userToken = match[1];
+                console.log("🍪 Token Cookie'den bulundu!");
+            }
+        }
+
         if (Array.isArray(userToken)) userToken = userToken[0];
 
         if (!userToken) {
-            console.error("❌ Hata: Token yok.");
-            // Eski kod çalışsın diye hata yerine boş liste dönebiliriz ama doğrusu 401'dir.
-            // Şimdilik sert çıkış yapıyoruz.
+            console.error("❌ Hata: Token yok. Headers:", Object.keys(req.headers));
             return res.status(401).json({ error: 'Token eksik. Whop üzerinden açın.' });
         }
 
