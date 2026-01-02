@@ -63,7 +63,7 @@ export default async function handler(req: any, res: any) {
 
         console.log(`📦 Gelen: ${allProducts.length} -> Temizlenen: ${cleanProducts.length}`);
 
-        return res.status(200).json(cleanProducts);
+        return res.status(200).json({ data: cleanProducts });
 
     } catch (error: any) {
         console.error('Sunucu Hatası:', error);
