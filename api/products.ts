@@ -1,14 +1,14 @@
-// import type { VercelRequest, VercelResponse } from '@vercel/node'; // Bağımlılık hatasını önlemek için kapalı
+// import type { VercelRequest, VercelResponse } from '@vercel/node'; // SİLİNDİ: Bağımlılık hatası riski
 
 export default async function handler(req: any, res: any) {
-    // 1. CORS AYARLARI (Tarayıcı İzni)
+    // 1. CORS VE CACHE AYARLARI (Önbellek Tutma!)
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-    res.setHeader(
-        'Access-Control-Allow-Headers',
-        'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization'
-    );
+    res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization, x-whop-user-token');
+
+    // ÖNEMLİ: Cache (Önbellek) kapatıldı. Her istekte taze veri çekilecek.
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
 
     if (req.method === 'OPTIONS') {
         res.status(200).end();
@@ -16,21 +16,24 @@ export default async function handler(req: any, res: any) {
     }
 
     try {
-        // 2. KULLANICI TOKEN'INI AL (Admin Şifresi ASLA KULLANILMAZ)
-        // Önce authorization header'dan, yoksa x-whop-user-token'dan al
-        let userToken = req.headers.authorization;
+        // 2. KULLANICI TOKEN'INI AL (Çift Kontrol)
+        let userToken = req.headers.authorization || req.headers['x-whop-user-token'];
 
-        if (!userToken && req.headers['x-whop-user-token']) {
-            userToken = `Bearer ${req.headers['x-whop-user-token']}`;
-        }
+        if (Array.isArray(userToken)) userToken = userToken[0];
 
         if (!userToken) {
-            console.error("❌ Hata: Token yok. Headers:", Object.keys(req.headers));
+            console.error("❌ Hata: Token bulunamadı.");
             return res.status(401).json({ error: 'Token eksik. Whop üzerinden açın.' });
         }
 
-        console.log("✅ Token bulundu");
-        // 3. WHOP API İSTEĞİ (Token ile Pass-Through)
+        // Token "Bearer " ile başlamıyorsa ekle
+        if (!userToken.startsWith('Bearer ')) {
+            userToken = `Bearer ${userToken}`;
+        }
+
+        console.log('🔒 Token ile Whop API sorgulanıyor...');
+
+        // 3. WHOP API İSTEĞİ (Pass-Through)
         // Sadece bu token sahibinin görebileceği ürünleri getirir.
         const response = await fetch('https://api.whop.com/api/v5/company/products', {
             method: 'GET',
@@ -41,9 +44,7 @@ export default async function handler(req: any, res: any) {
         });
 
         if (!response.ok) {
-            // Token süresi dolmuşsa veya geçersizse
             if (response.status === 401) return res.status(401).json({ error: 'Token geçersiz.' });
-
             const errorText = await response.text();
             return res.status(response.status).json({ error: `Whop API Hatası`, details: errorText });
         }
@@ -51,19 +52,14 @@ export default async function handler(req: any, res: any) {
         const data = await response.json();
         const allProducts = Array.isArray(data) ? data : (data.data || []);
 
-        // 4. GÜMRÜK (FİLTRELEME)
-        // İsmi olmayan, silinmiş veya bozuk verileri listeden atıyoruz.
+        // 4. TEMİZLİK (Gereksiz veriyi at)
         const cleanProducts = allProducts.filter((p: any) => {
-            // ID'si ve İsmi olmak zorunda
-            if (!p.id || !p.name) return false;
-            // İsmi boşluktan ibaret olmamalı
-            if (p.name.trim() === '') return false;
-            return true;
+            return p.id && p.name && p.name.trim() !== '';
         });
 
-        console.log(`📦 Gelen: ${allProducts.length} -> Temizlenen: ${cleanProducts.length}`);
+        console.log(`📦 Taze Veri: ${cleanProducts.length} ürün bulundu.`);
 
-        return res.status(200).json({ data: cleanProducts });
+        return res.status(200).json(cleanProducts);
 
     } catch (error: any) {
         console.error('Sunucu Hatası:', error);
