@@ -17,13 +17,19 @@ export default async function handler(req: any, res: any) {
 
     try {
         // 2. KULLANICI TOKEN'INI AL (Admin Şifresi ASLA KULLANILMAZ)
-        const userToken = req.headers.authorization;
+        // Önce authorization header'dan, yoksa x-whop-user-token'dan al
+        let userToken = req.headers.authorization;
+
+        if (!userToken && req.headers['x-whop-user-token']) {
+            userToken = `Bearer ${req.headers['x-whop-user-token']}`;
+        }
 
         if (!userToken) {
-            console.error("❌ Hata: Token yok.");
+            console.error("❌ Hata: Token yok. Headers:", Object.keys(req.headers));
             return res.status(401).json({ error: 'Token eksik. Whop üzerinden açın.' });
         }
 
+        console.log("✅ Token bulundu");
         // 3. WHOP API İSTEĞİ (Token ile Pass-Through)
         // Sadece bu token sahibinin görebileceği ürünleri getirir.
         const response = await fetch('https://api.whop.com/api/v5/company/products', {
