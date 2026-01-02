@@ -51,7 +51,7 @@ export default async function handler(req: any, res: any) {
             const errorText = await response.text();
             // Token hatası ise
             if (response.status === 401) return res.status(401).json({ error: 'Token geçersiz.' });
-            return res.status(response.status).json({ error: `Whop API Hatası`, details: errorText });
+            return res.status(response.status).json({ error: `Whop API Connection Error (V2)`, details: errorText });
         }
 
         const data = await response.json();
