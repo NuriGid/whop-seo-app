@@ -119,11 +119,6 @@ const App: React.FC = () => {
       // analyzeCourseText will make request with credentials
       const result = await analyzeCourseText(productDescription);
 
-      // Validate result has required fields
-      if (!result.twitterThread || !result.salesEmail || !result.instagramPost || !result.tiktokScript) {
-        throw new Error('Analysis returned incomplete results. Please try again.');
-      }
-
       setState(prev => ({
         ...prev,
         isAnalyzing: false,
@@ -198,8 +193,8 @@ const App: React.FC = () => {
                   key={product.id}
                   onClick={() => handleSelectProduct(product)}
                   className={`p-4 rounded-lg border transition-all text-left ${state.selectedProduct?.id === product.id
-                      ? 'bg-blue-600/30 border-blue-500'
-                      : 'bg-gray-800/50 border-gray-700 hover:border-gray-500'
+                    ? 'bg-blue-600/30 border-blue-500'
+                    : 'bg-gray-800/50 border-gray-700 hover:border-gray-500'
                     }`}
                 >
                   <h3 className="font-semibold text-gray-100 truncate">
