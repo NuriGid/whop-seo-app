@@ -62,10 +62,13 @@ const App: React.FC = () => {
           const errorData = await response.json().catch(() => ({}));
 
           if (response.status === 401) {
-            throw new Error('Authentication failed. Please refresh the page or re-open the app from Whop.');
+            const msg = errorData.message || errorData.error || 'Authentication failed';
+            // Detayı varsa gösterelim
+            const detail = errorData.details ? ` (${errorData.details})` : '';
+            throw new Error(`Auth Error: ${msg}${detail}`);
           }
 
-          throw new Error(errorData.message || errorData.error || `Failed to fetch products: ${response.status}`);
+          throw new Error(errorData.details || errorData.message || errorData.error || `Failed to fetch products: ${response.status}`);
         }
 
         const data = await response.json();
