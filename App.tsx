@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { WhopProduct, AnalysisResult } from './types';
-import { analyzeCourseText } from './services/geminiService';
+// import { analyzeCourseText } from './services/geminiService'; // REMOVED FOR DEBUGGING
 import ResultCard from './components/ResultCard';
 import Loader from './components/Loader';
 
@@ -107,9 +108,13 @@ const App: React.FC = () => {
     }));
   }, []);
 
-  // Handle analysis
+  // Handle analysis (INLINED DEBUG VERSION)
   const handleAnalyze = useCallback(async () => {
     if (!state.selectedProduct) return;
+
+    // DEBUG STEP 1
+    const confirmStart = window.confirm("DEBUG: Analiz Başlatılıyor. Devam?");
+    if (!confirmStart) return;
 
     setState(prev => ({ ...prev, isAnalyzing: true, analysisError: null }));
 
@@ -119,17 +124,57 @@ const App: React.FC = () => {
         Description: ${state.selectedProduct.description || 'No description available'}
       `.trim();
 
-      // analyzeCourseText will make request with credentials
-      const result = await analyzeCourseText(productDescription);
+      // DEBUG STEP 2
+      console.log("Fetching /api/analyze...");
+
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ prompt: productDescription })
+      });
+
+      // DEBUG STEP 3
+      console.log(`Response Status: ${response.status}`);
+      if (!response.ok) {
+        const errText = await response.text();
+        alert(`HATA: Backend ${response.status} döndü.\n${errText}`);
+        throw new Error(`Backend Error ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      // DEBUG STEP 4
+      alert(`Backend Yanıtı Geldi!\nKeys: ${Object.keys(result).join(', ')}`);
+      console.log("Result Data:", result);
+
+      if (result.logs) {
+        console.log("---- SERVER LOGS ----");
+        console.log(result.logs.join('\n'));
+        console.log("---------------------");
+      }
+
+      const finalResult: AnalysisResult = {
+        twitterThread: result.twitterThread || result.twitter || "Veri Yok",
+        salesEmail: result.salesEmail || result.email || "Veri Yok",
+        instagramPost: result.instagramPost || result.instagram || "Veri Yok",
+        tiktokScript: result.tiktokScript || result.tiktok || "Veri Yok"
+      };
 
       setState(prev => ({
         ...prev,
         isAnalyzing: false,
-        analysisResult: result,
+        analysisResult: finalResult,
       }));
+
+      // DEBUG STEP 5
+      alert("State Güncellendi! Ekran değişmeli.");
 
     } catch (error) {
       console.error('❌ Analysis failed:', error);
+      alert(`CATCH BLOĞU: ${error}`);
       setState(prev => ({
         ...prev,
         isAnalyzing: false,
@@ -268,4 +313,3 @@ const App: React.FC = () => {
 };
 
 export default App;
-// Force rebuild Fri Jan  2 04:34:43 +03 2026
