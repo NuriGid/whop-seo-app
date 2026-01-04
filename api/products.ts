@@ -36,7 +36,8 @@ export default async function handler(req: any, res: any) {
             return res.status(401).json({ error: 'Token eksik. Whop üzerinden açın.' });
         }
 
-        if (!userToken.startsWith('Bearer ')) userToken = `Bearer ${userToken}`;
+        // Bearer prefix'i zorlamıyoruz, token neyse onu yolluyoruz
+        // if (!userToken.startsWith('Bearer ')) userToken = `Bearer ${userToken}`;
 
         // 3. API İSTEĞİ
         const response = await fetch('https://api.whop.com/api/v5/company/products', {
@@ -48,10 +49,12 @@ export default async function handler(req: any, res: any) {
         });
 
         if (!response.ok) {
-            const errorText = await response.text();
             // Token hatası ise
-            if (response.status === 401) return res.status(401).json({ error: 'Token geçersiz.' });
-            return res.status(response.status).json({ error: `Whop API Connection Error (V2)`, details: errorText });
+            if (response.status === 401) return res.status(401).json({ error: 'Token geçersiz (401).' });
+
+            const errorText = await response.text();
+            console.error("Whop API Error:", errorText);
+            return res.status(response.status).json({ error: `API ERROR V4`, details: errorText });
         }
 
         const data = await response.json();
