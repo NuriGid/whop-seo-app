@@ -1,4 +1,3 @@
-import { WhopSDK } from '@whop/sdk';
 
 export default async function handler(req: any, res: any) {
     // 1. CORS VE CACHE
@@ -12,37 +11,56 @@ export default async function handler(req: any, res: any) {
 
     try {
         // 2. TOKEN ÇIKARMA
-        let userToken = req.headers.authorization || req.headers['x-whop-user-token'];
+        const envApiKey = process.env.WHOP_API_KEY;
+        let authHeader = req.headers.authorization || req.headers['x-whop-user-token'];
 
-        if (!userToken && req.headers.cookie) {
+        // Cookie Fallback
+        if (!authHeader && req.headers.cookie) {
             const match = req.headers.cookie.match(/whop_user_token=([^;]+)/);
-            if (match) userToken = match[1];
+            if (match) authHeader = match[1];
         }
 
-        if (Array.isArray(userToken)) userToken = userToken[0];
+        if (Array.isArray(authHeader)) authHeader = authHeader[0];
 
-        if (!userToken) {
-            return res.status(401).json({ error: 'Token eksik (SDK).' });
+        // KARAR ANI: API Key mi, User Token mı?
+        let finalToken = '';
+
+        if (envApiKey) {
+            console.log("🔑 Using Server API Key (Priority)");
+            finalToken = envApiKey.startsWith('Bearer ') ? envApiKey : `Bearer ${envApiKey}`;
+        } else if (authHeader) {
+            console.log("👤 Using User Token (Client)");
+            finalToken = authHeader.startsWith('Bearer ') ? authHeader : `Bearer ${authHeader}`;
+        } else {
+            return res.status(401).json({ error: 'Token eksik. API Key veya User Token yok.' });
         }
 
-        // Token temizliği (SDK Bearer isteyebilir)
-        if (!userToken.startsWith('Bearer ')) userToken = `Bearer ${userToken}`;
-
-        // 3. SDK BAŞLATMA
-        // SDK Kullanımı:
-        const whop = new WhopSDK({ token: userToken });
-
-        // 4. API ÇAĞRISI
-        const response = await whop.companyProducts.list({
-            visibility: 'visible',
-            limit: 100
+        // 3. API İSTEĞİ (MANUEL FETCH)
+        const response = await fetch('https://api.whop.com/api/v5/company/products', {
+            method: 'GET',
+            headers: {
+                'Authorization': finalToken,
+                'Content-Type': 'application/json'
+            }
         });
 
-        // SDK dönüş tipine göre data'yı al
-        // Genelde response.data veya direkt array döner
-        const allProducts = (response as any).data || response || [];
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error("Whop API Error:", response.status, errorText);
 
-        // 5. FİLTRELEME
+            if (response.status === 401) {
+                return res.status(401).json({
+                    error: 'Authentication Failed (401)',
+                    details: 'Check WHOP_API_KEY or User Permissions.'
+                });
+            }
+            return res.status(response.status).json({ error: `API ERROR V-KEY`, details: errorText });
+        }
+
+        const data = await response.json();
+        const allProducts = Array.isArray(data) ? data : (data.data || []);
+
+        // 4. FİLTRELEME
         const cleanProducts = Array.isArray(allProducts) ? allProducts.filter((p: any) => {
             if (!p.id || !p.name) return false;
             const name = p.name.trim().toLowerCase();
@@ -55,10 +73,7 @@ export default async function handler(req: any, res: any) {
         return res.status(200).json({ data: cleanProducts });
 
     } catch (error: any) {
-        console.error("SDK Error:", error);
-        return res.status(500).json({
-            error: `SDK ERROR V1`,
-            details: error.message
-        });
+        console.error("Handler Error:", error);
+        return res.status(500).json({ error: error.message });
     }
 }
