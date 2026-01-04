@@ -1,106 +1,64 @@
-// import type { VercelRequest, VercelResponse } from '@vercel/node'; // SİLİNDİ: Hata kaynağı
+import { WhopSDK } from '@whop/sdk';
 
 export default async function handler(req: any, res: any) {
-    // 1. CORS VE CACHE AYARLARI
+    // 1. CORS VE CACHE
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization, x-whop-user-token');
-
-    // Önbelleği kapatıyoruz ki sildiğin ürün geri gelmesin
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
 
-    if (req.method === 'OPTIONS') {
-        res.status(200).end();
-        return;
-    }
+    if (req.method === 'OPTIONS') return res.status(200).end();
 
     try {
-        // 2. KULLANICI TOKEN'INI AL (Header + Cookie Kontrolü)
+        // 2. TOKEN ÇIKARMA
         let userToken = req.headers.authorization || req.headers['x-whop-user-token'];
 
-        // Cookie'den de kontrol et (Safari için kritik)
         if (!userToken && req.headers.cookie) {
-            const cookieStr = req.headers.cookie;
-            const match = cookieStr.match(/whop_user_token=([^;]+)/);
-            if (match && match[1]) {
-                userToken = match[1];
-                console.log("🍪 Token Cookie'den bulundu!");
-            }
+            const match = req.headers.cookie.match(/whop_user_token=([^;]+)/);
+            if (match) userToken = match[1];
         }
 
         if (Array.isArray(userToken)) userToken = userToken[0];
 
         if (!userToken) {
-            console.error("❌ Hata: Token yok. Headers:", Object.keys(req.headers));
-            return res.status(401).json({ error: 'Token eksik. Whop üzerinden açın.' });
+            return res.status(401).json({ error: 'Token eksik (SDK).' });
         }
 
-        // Bearer prefix'i zorlamıyoruz, token neyse onu yolluyoruz
-        // if (!userToken.startsWith('Bearer ')) userToken = `Bearer ${userToken}`;
+        // Token temizliği (SDK Bearer isteyebilir)
+        if (!userToken.startsWith('Bearer ')) userToken = `Bearer ${userToken}`;
 
-        // 3. API İSTEĞİ
-        const response = await fetch('https://api.whop.com/api/v5/company/products', {
-            method: 'GET',
-            headers: {
-                'Authorization': userToken,
-                'Content-Type': 'application/json'
-            }
+        // 3. SDK BAŞLATMA
+        // SDK Kullanımı:
+        const whop = new WhopSDK({ token: userToken });
+
+        // 4. API ÇAĞRISI
+        const response = await whop.companyProducts.list({
+            visibility: 'visible',
+            limit: 100
         });
 
-        if (!response.ok) {
-            // Token hatası ise
-            if (response.status === 401) return res.status(401).json({ error: 'Token geçersiz (401).' });
+        // SDK dönüş tipine göre data'yı al
+        // Genelde response.data veya direkt array döner
+        const allProducts = (response as any).data || response || [];
 
-            const errorText = await response.text();
-            console.error("Whop API Error:", errorText);
-            return res.status(response.status).json({ error: `API ERROR V4`, details: errorText });
-        }
-
-        const data = await response.json();
-        const allProducts = Array.isArray(data) ? data : (data.data || []);
-
-        // 🕵️ AJAN LOG: Ürünlerin detaylarını görelim ki silinenleri tespit edelim
-        if (allProducts.length > 0) {
-            console.log("🔍 İLK ÜRÜN ÖRNEĞİ:", JSON.stringify(allProducts[0], null, 2));
-        }
-
-        // 4. GÜMRÜK KONTROLÜ (FİLTRELEME)
-        // İşte burası o "hayalet ürünleri" temizler.
-        const cleanProducts = allProducts.filter((p: any) => {
-            // İsmi olmayanları at
+        // 5. FİLTRELEME
+        const cleanProducts = Array.isArray(allProducts) ? allProducts.filter((p: any) => {
             if (!p.id || !p.name) return false;
-            const name = p.name.trim();
-            if (name === '') return false;
-
-            // 🚫 MANUEL FİLTRE: Silinmiş ama API'den gelenler (Case-insensitive & Partial)
-            const normalizedName = name.toLowerCase();
-            const blacklistedTerms = [
-                'benim uygulamam',
-                'seo assistant',
-                'crypto trading fu'
-            ];
-
-            if (blacklistedTerms.some(term => normalizedName.includes(term))) {
-                console.log(`🗑️ Kara liste ürünü gizlendi: ${name}`);
-                return false;
-            }
-
-            // Gelişmiş Filtre: Whop status kontrolü
-            if (p.visibility === 'hidden' || p.visibility === 'archived' || p.status === 'deleted') {
-                console.log(`🗑️ Gizli/Silinmiş ürün filtrelendi: ${name}`);
-                return false;
-            }
-
+            const name = p.name.trim().toLowerCase();
+            const blacklistedTerms = ['benim uygulamam', 'seo assistant', 'crypto trading fu'];
+            if (blacklistedTerms.some(term => name.includes(term))) return false;
+            if (p.visibility === 'hidden' || p.visibility === 'archived' || p.status === 'deleted') return false;
             return true;
-        });
+        }) : [];
 
-        console.log(`📦 Toplam: ${allProducts.length} -> Temiz: ${cleanProducts.length}`);
-
-        // Frontend beklediği format: { data: [...] }
         return res.status(200).json({ data: cleanProducts });
 
     } catch (error: any) {
-        return res.status(500).json({ error: error.message });
+        console.error("SDK Error:", error);
+        return res.status(500).json({
+            error: `SDK ERROR V1`,
+            details: error.message
+        });
     }
 }
