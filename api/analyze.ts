@@ -38,11 +38,12 @@ export default async function handler(req: any, res: any) {
   try {
     // 1. API KEY KONTROLÜ
     if (!GROQ_API_KEY) {
-      return returnErrorAsSuccess('Vercel ayarlarında GROQ_API_KEY eksik!');
+      console.error("❌ HATA: GROQ_API_KEY yok!");
+      return returnErrorAsSuccess('⚠️ Vercel AYARLARINDA GROQ_API_KEY EKSİK! Lütfen ekleyin.');
     }
 
     if (!req.body || !req.body.prompt) {
-      return returnErrorAsSuccess('Prompt verisi gelmedi (req.body boş).');
+      return returnErrorAsSuccess('⚠️ Prompt verisi gelmedi.');
     }
 
     const { prompt } = req.body;

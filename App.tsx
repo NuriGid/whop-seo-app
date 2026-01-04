@@ -180,11 +180,20 @@ const App: React.FC = () => {
         {!state.productsError && state.products.length === 0 && (
           <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-8 text-center">
             <h2 className="text-xl font-semibold text-gray-300 mb-2">No courses found</h2>
-            <p className="text-gray-400">
-              You don't have any products in your Whop company yet.
-            </p>
+            <div className="p-2 rounded-full bg-[#2a2a2a] text-gray-400" title="Running in Whop">
+              {/* Whop Icon placeholder/svg */}
+              <span className="font-mono text-xs">&lt;/&gt;</span>
+            </div>
           </div>
         )}
+
+        {/* 🕵️‍♂️ DEBUGGER (Geçici) */}
+        <div className="bg-black/30 border border-gray-700 p-2 rounded mb-4 text-xs font-mono text-gray-400">
+          <p><strong>Debug Info:</strong></p>
+          <p>State: {state.isAnalyzing ? '⏳ Analyzing...' : '✅ Ready'}</p>
+          <p>Result: {state.analysisResult ? '📦 Data Var' : '❌ Veri Yok'}</p>
+          {state.analysisError && <p className="text-red-400">Error: {state.analysisError}</p>}
+        </div>
 
         {/* Products List */}
         {state.products.length > 0 && (
