@@ -1,4 +1,3 @@
-// import type { VercelRequest, VercelResponse } from '@vercel/node'; // SİLİNDİ: 500 Hatası Kaynağı
 
 const GROQ_API_KEY = (process.env.GROQ_API_KEY || '').trim();
 
@@ -9,47 +8,50 @@ export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
   res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization');
 
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
-  }
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
-  // Helper function to return 200 with error message in fields
-  // This bypasses Frontend's generic error handling and shows the real error in UI
-  const returnErrorAsSuccess = (msg: string) => {
-    console.error("❌ Hata (UI'a iletiliyor):", msg);
+  let debugLogs: string[] = [];
+  const log = (msg: string) => {
+    console.log(msg);
+    debugLogs.push(msg); // Logs to return in response
+  };
+
+  log("🚀 API /api/analyze Tetiklendi");
+
+  // Helper to return error visible in UI fields
+  const returnErrorAsSuccess = (msg: string, details: string = '') => {
+    log(`❌ HATA DÖNÜLÜYOR: ${msg} - ${details}`);
     return res.status(200).json({
-      twitter: `⚠️ HATA: ${msg}`,
-      email: `⚠️ HATA: ${msg}`,
-      instagram: `⚠️ HATA: ${msg}`,
-      tiktok: `⚠️ HATA: ${msg}`,
-      // Eski formatlar için
-      twitterThread: `⚠️ HATA: ${msg}`,
-      salesEmail: `⚠️ HATA: ${msg}`,
-      instagramPost: `⚠️ HATA: ${msg}`,
-      tiktokScript: `⚠️ HATA: ${msg}`
+      debug_error: msg,
+      debug_details: details,
+      logs: debugLogs,
+      // Frontend Inputs
+      twitter: `🔴 HATA: ${msg}`,
+      email: `🔴 HATA: ${msg}`,
+      instagram: `🔴 HATA: ${msg}`,
+      tiktok: `🔴 HATA: ${msg}`,
+      twitterThread: `🔴 HATA: ${msg}`,
+      salesEmail: `🔴 HATA: ${msg} \n\nDetay: ${details}`,
+      instagramPost: `🔴 HATA: ${msg}`,
+      tiktokScript: `🔴 HATA: ${msg}`
     });
   };
 
-  if (req.method !== 'POST') {
-    return returnErrorAsSuccess('Sadece POST isteği atılabilir.');
-  }
+  if (req.method !== 'POST') return returnErrorAsSuccess('Sadece POST isteği atılabilir.');
 
   try {
     // 1. API KEY KONTROLÜ
     if (!GROQ_API_KEY) {
-      console.error("❌ HATA: GROQ_API_KEY yok!");
-      return returnErrorAsSuccess('⚠️ Vercel AYARLARINDA GROQ_API_KEY EKSİK! Lütfen ekleyin.');
+      return returnErrorAsSuccess('GROQ_API_KEY EKSİK', 'Vercel Env Variables kontrol edin.');
     }
 
     if (!req.body || !req.body.prompt) {
-      return returnErrorAsSuccess('⚠️ Prompt verisi gelmedi.');
+      return returnErrorAsSuccess('Prompt verisi gelmedi', 'req.body.prompt boş');
     }
 
     const { prompt } = req.body;
     const model = 'llama-3.1-8b-instant';
-
-    console.log(`⚡️ Groq (${model}) çalışıyor... Prompt: ${prompt.substring(0, 50)}...`);
+    log(`⚡️ Groq İsteği: ${model} - Uzunluk: ${prompt.length}`);
 
     // 2. GROQ İSTEĞİ
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -71,60 +73,55 @@ export default async function handler(req: any, res: any) {
             Course: ${prompt}`
           }
         ],
-        temperature: 0.3,
-        // response_format: { type: "json_object" } // Kaldırıldı, manuel parse daha güvenli
+        temperature: 0.3
       })
     });
 
+    log(`📡 Groq HTTP Status: ${response.status}`);
+
     if (!response.ok) {
-      const errData = await response.json();
-      const errMsg = errData.error?.message || `Groq Hatası: ${response.status}`;
-      return returnErrorAsSuccess(errMsg);
+      const errText = await response.text();
+      return returnErrorAsSuccess(`Groq API Hatası (${response.status})`, errText);
     }
 
     const data = await response.json();
     const textAnswer = data.choices?.[0]?.message?.content || "{}";
+    log(`📝 Ham Yanıt Uzunluğu: ${textAnswer.length}`);
 
-    // 3. JSON PARSE VE GARANTİLEME
+    // 3. JSON PARSE
     let parsedData: any = {};
     try {
       const firstBrace = textAnswer.indexOf('{');
       const lastBrace = textAnswer.lastIndexOf('}');
       if (firstBrace !== -1 && lastBrace !== -1) {
         parsedData = JSON.parse(textAnswer.substring(firstBrace, lastBrace + 1));
+        log("✅ JSON Parse Başarılı");
       } else {
-        // JSON bulunamadıysa ham metni basmaya çalış
-        console.warn("JSON parantezleri bulunamadı.");
+        log("⚠️ JSON Parantezleri Bulunamadı! Ham yanıt dönülüyor.");
+        return returnErrorAsSuccess("JSON Bulunamadı", textAnswer.substring(0, 100));
       }
     } catch (e) {
-      console.error("JSON Parse Hatası");
+      log("❌ JSON Parse Hatası");
+      return returnErrorAsSuccess("JSON Parse Hatası", textAnswer.substring(0, 50));
     }
 
-    // Frontend ne beklerse beklesin dolu gönderiyoruz
-    const fallback = "Generating content...";
+    // Başarılı Dönüş
+    const fallback = "İçerik üretilemedi.";
 
-    // Eğer parse başarısız olduysa ve data boşsa, hata mesajı dön
-    if (Object.keys(parsedData).length === 0) {
-      // Belki JSON değil düz metin döndü?
-      return returnErrorAsSuccess("Yapay zeka JSON üretemedi. Tekrar deneyin.");
-    }
-
-    const safeResponse = {
+    return res.status(200).json({
+      logs: debugLogs,
       twitter: parsedData.twitter || parsedData.twitterThread || fallback,
       email: parsedData.email || parsedData.salesEmail || fallback,
       instagram: parsedData.instagram || parsedData.instagramPost || fallback,
       tiktok: parsedData.tiktok || parsedData.tiktokScript || fallback,
-
+      // Yedekler
       twitterThread: parsedData.twitter || parsedData.twitterThread || fallback,
       salesEmail: parsedData.email || parsedData.salesEmail || fallback,
       instagramPost: parsedData.instagram || parsedData.instagramPost || fallback,
       tiktokScript: parsedData.tiktok || parsedData.tiktokScript || fallback
-    };
-
-    return res.status(200).json(safeResponse);
+    });
 
   } catch (error: any) {
-    console.error("❌ Kritik Hata:", error.message);
-    return returnErrorAsSuccess(error.message || "Bilinmeyen Sunucu Hatası");
+    return returnErrorAsSuccess("Sunucu İçi Hata", error.message);
   }
 }
