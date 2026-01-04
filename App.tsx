@@ -49,8 +49,6 @@ const App: React.FC = () => {
       try {
         console.log('📦 Fetching products from Whop API...');
 
-        // Whop automatically injects auth headers in iframe requests
-        // We use 'credentials: include' to send cookies
         const response = await fetch('/api/products', {
           method: 'GET',
           credentials: 'include',
@@ -61,19 +59,15 @@ const App: React.FC = () => {
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
-
-          if (response.status === 401) {
-            const msg = errorData.message || errorData.error || 'Authentication failed';
-            // Detayı varsa gösterelim
-            const detail = errorData.details ? ` (${errorData.details})` : '';
-            throw new Error(`Auth Error: ${msg}${detail}`);
-          }
-
-          throw new Error(errorData.details || errorData.message || errorData.error || `Failed to fetch products: ${response.status}`);
+          const msg = errorData.message || errorData.error || `Error ${response.status}`;
+          throw new Error(msg);
         }
 
         const data = await response.json();
         const products: WhopProduct[] = data.data || [];
+
+        // Auto-select first product if available (User friendly)
+        const initialSelected = products.length > 0 ? products[0] : null;
 
         console.log(`✅ Loaded ${products.length} products`);
 
@@ -81,6 +75,7 @@ const App: React.FC = () => {
           ...prev,
           isLoading: false,
           products,
+          selectedProduct: initialSelected,
           productsError: null,
         }));
 
@@ -98,15 +93,16 @@ const App: React.FC = () => {
     init();
   }, []);
 
-  // Handle product selection
-  const handleSelectProduct = useCallback((product: WhopProduct) => {
+  // Handle product selection via Dropdown
+  const handleSelectProduct = useCallback((productId: string) => {
+    const product = state.products.find(p => p.id === productId) || null;
     setState(prev => ({
       ...prev,
       selectedProduct: product,
       analysisResult: null,
       analysisError: null,
     }));
-  }, []);
+  }, [state.products]);
 
   // Handle analysis (INLINED DEBUG VERSION)
   const handleAnalyze = useCallback(async () => {
@@ -148,12 +144,10 @@ const App: React.FC = () => {
 
       // DEBUG STEP 4
       alert(`Backend Yanıtı Geldi!\nKeys: ${Object.keys(result).join(', ')}`);
-      console.log("Result Data:", result);
 
       if (result.logs) {
         console.log("---- SERVER LOGS ----");
         console.log(result.logs.join('\n'));
-        console.log("---------------------");
       }
 
       const finalResult: AnalysisResult = {
@@ -183,21 +177,6 @@ const App: React.FC = () => {
     }
   }, [state.selectedProduct]);
 
-  // Not in Whop iframe error state
-  if (!state.isInWhop && !state.isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="bg-red-900/50 border border-red-700 rounded-lg p-6 max-w-md text-center">
-          <h2 className="text-xl font-semibold text-red-300 mb-2">Access Denied</h2>
-          <p className="text-gray-300">{state.productsError}</p>
-          <p className="text-gray-400 text-sm mt-4">
-            This app must be opened from within Whop.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   // Loading state
   if (state.isLoading) {
     return (
@@ -209,89 +188,68 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100 p-6">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-3xl mx-auto">
         <h1 className="text-3xl font-bold text-center mb-8 bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
           Whop Content Marketing Assistant
         </h1>
 
-        {/* Products Error */}
-        {state.productsError && (
-          <div className="bg-red-900/50 border border-red-700 rounded-lg p-4 mb-6">
-            <p className="text-red-300">{state.productsError}</p>
-          </div>
-        )}
-
-        {/* No Products */}
-        {!state.productsError && state.products.length === 0 && (
-          <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-8 text-center">
-            <h2 className="text-xl font-semibold text-gray-300 mb-2">No courses found</h2>
-            <div className="p-2 rounded-full bg-[#2a2a2a] text-gray-400" title="Running in Whop">
-              {/* Whop Icon placeholder/svg */}
-              <span className="font-mono text-xs">&lt;/&gt;</span>
-            </div>
-          </div>
-        )}
-
-        {/* 🕵️‍♂️ DEBUGGER (Geçici) */}
-        <div className="bg-black/30 border border-gray-700 p-2 rounded mb-4 text-xs font-mono text-gray-400">
+        {/* 🕵️‍♂️ DEBUGGER */}
+        <div className="bg-black/30 border border-gray-700 p-2 rounded mb-6 text-xs font-mono text-gray-400">
           <p><strong>Debug Info:</strong></p>
-          <p>State: {state.isAnalyzing ? '⏳ Analyzing...' : '✅ Ready'}</p>
           <p>Result: {state.analysisResult ? '📦 Data Var' : '❌ Veri Yok'}</p>
           {state.analysisError && <p className="text-red-400">Error: {state.analysisError}</p>}
         </div>
 
-        {/* Products List */}
-        {state.products.length > 0 && (
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold mb-4">Select a Product to Analyze</h2>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6 mb-8">
+          <label className="block text-sm font-medium text-gray-300 mb-2">
+            Select Course
+          </label>
+
+          {/* DROPDOWN UI (Restored) */}
+          <div className="relative">
+            <select
+              className="w-full bg-gray-900 border border-gray-700 text-white rounded-lg p-3 appearance-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              value={state.selectedProduct?.id || ''}
+              onChange={(e) => handleSelectProduct(e.target.value)}
+            >
+              <option value="" disabled>Select a product...</option>
               {state.products.map(product => (
-                <button
-                  key={product.id}
-                  onClick={() => handleSelectProduct(product)}
-                  className={`p-4 rounded-lg border transition-all text-left ${state.selectedProduct?.id === product.id
-                    ? 'bg-blue-600/30 border-blue-500'
-                    : 'bg-gray-800/50 border-gray-700 hover:border-gray-500'
-                    }`}
-                >
-                  <h3 className="font-semibold text-gray-100 truncate">
-                    {product.name || product.title || 'Unnamed Product'}
-                  </h3>
-                  {product.description && (
-                    <p className="text-sm text-gray-400 mt-1 line-clamp-2">
-                      {product.description}
-                    </p>
-                  )}
-                </button>
+                <option key={product.id} value={product.id}>
+                  {product.name || product.title}
+                </option>
               ))}
+            </select>
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
+              <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+              </svg>
             </div>
           </div>
-        )}
+        </div>
 
-        {/* Selected Product */}
+        {/* Selected Product Details & Generate Button */}
         {state.selectedProduct && (
-          <div className="mb-8">
-            <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6">
-              <h3 className="text-lg font-semibold mb-2">
-                Selected: {state.selectedProduct.name || state.selectedProduct.title}
-              </h3>
-              <p className="text-gray-400 mb-4">
-                {state.selectedProduct.description || 'No description available'}
-              </p>
-              <button
-                onClick={handleAnalyze}
-                disabled={state.isAnalyzing}
-                className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-lg transition-all"
-              >
-                {state.isAnalyzing ? 'Generating Content...' : 'Generate Marketing Content'}
-              </button>
+          <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6 mb-8">
+            <div className="mb-4">
+              <p className="text-gray-400 text-sm mb-1">Description:</p>
+              <div className="w-full bg-gray-900/50 rounded p-3 text-gray-300 min-h-[80px]">
+                {state.selectedProduct.description || 'No description available for this product.'}
+              </div>
             </div>
+
+            <button
+              onClick={handleAnalyze}
+              disabled={state.isAnalyzing}
+              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-lg transition-all shadow-lg shadow-blue-900/20"
+            >
+              {state.isAnalyzing ? 'Generating Content...' : 'Generate'}
+            </button>
           </div>
         )}
 
         {/* Analysis Loading */}
         {state.isAnalyzing && (
-          <div className="flex justify-center">
+          <div className="flex justify-center mb-8">
             <Loader />
           </div>
         )}
