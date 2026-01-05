@@ -10,50 +10,37 @@ export default async function handler(req: any, res: any) {
 
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  let debugLogs: string[] = [];
-  const log = (msg: string) => {
-    console.log(msg);
-    debugLogs.push(msg); // Logs to return in response
-  };
-
-  log("🚀 API /api/analyze Tetiklendi");
-
   // Helper to return error visible in UI fields
-  const returnErrorAsSuccess = (msg: string, details: string = '') => {
-    log(`❌ HATA DÖNÜLÜYOR: ${msg} - ${details}`);
+  const returnError = (msg: string, details: string = '') => {
+    console.error(`❌ HATA: ${msg}`, details);
     return res.status(200).json({
-      debug_error: msg,
-      debug_details: details,
-      logs: debugLogs,
-      // Frontend Inputs
       twitter: `🔴 HATA: ${msg}`,
-      email: `🔴 HATA: ${msg}`,
+      email: `🔴 HATA: ${msg}\n\nDetay: ${details}`,
       instagram: `🔴 HATA: ${msg}`,
       tiktok: `🔴 HATA: ${msg}`,
       twitterThread: `🔴 HATA: ${msg}`,
-      salesEmail: `🔴 HATA: ${msg} \n\nDetay: ${details}`,
+      salesEmail: `🔴 HATA: ${msg}\n\nDetay: ${details}`,
       instagramPost: `🔴 HATA: ${msg}`,
       tiktokScript: `🔴 HATA: ${msg}`
     });
   };
 
-  if (req.method !== 'POST') return returnErrorAsSuccess('Sadece POST isteği atılabilir.');
+  if (req.method !== 'POST') return returnError('Sadece POST isteği.');
 
   try {
-    // 1. API KEY KONTROLÜ
     if (!GROQ_API_KEY) {
-      return returnErrorAsSuccess('GROQ_API_KEY EKSİK', 'Vercel Env Variables kontrol edin.');
+      return returnError('GROQ_API_KEY EKSİK', 'Vercel Env Variables kontrol edin.');
     }
 
     if (!req.body || !req.body.prompt) {
-      return returnErrorAsSuccess('Prompt verisi gelmedi', 'req.body.prompt boş');
+      return returnError('Prompt verisi gelmedi');
     }
 
     const { prompt } = req.body;
     const model = 'llama-3.1-8b-instant';
-    log(`⚡️ Groq İsteği: ${model} - Uzunluk: ${prompt.length}`);
 
-    // 2. GROQ İSTEĞİ
+    console.log(`⚡️ Groq İsteği: ${model}`);
+
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -65,63 +52,82 @@ export default async function handler(req: any, res: any) {
         messages: [
           {
             role: "system",
-            content: "You are an expert marketing assistant. You Output ONLY valid JSON."
+            content: `You are a marketing content generator. Generate marketing content and return ONLY a valid JSON object (no markdown, no code blocks). 
+            
+            Return exactly this structure:
+            {"twitter": "tweet text here", "email": "email text here", "instagram": "instagram caption here", "tiktok": "tiktok script here"}`
           },
           {
             role: "user",
-            content: `Create marketing content. Return JSON keys: twitter, email, instagram, tiktok.
-            Course: ${prompt}`
+            content: `Generate marketing content for this course. Return ONLY JSON, no markdown:
+            
+            ${prompt}`
           }
         ],
-        temperature: 0.3
+        temperature: 0.7
       })
     });
 
-    log(`📡 Groq HTTP Status: ${response.status}`);
-
     if (!response.ok) {
       const errText = await response.text();
-      return returnErrorAsSuccess(`Groq API Hatası (${response.status})`, errText);
+      return returnError(`Groq API Hatası (${response.status})`, errText);
     }
 
     const data = await response.json();
-    const textAnswer = data.choices?.[0]?.message?.content || "{}";
-    log(`📝 Ham Yanıt Uzunluğu: ${textAnswer.length}`);
+    let textAnswer = data.choices?.[0]?.message?.content || "{}";
 
-    // 3. JSON PARSE
+    console.log("📝 Ham Yanıt:", textAnswer.substring(0, 200));
+
+    // Clean markdown code blocks if present
+    textAnswer = textAnswer
+      .replace(/```json\s*/gi, '')
+      .replace(/```\s*/g, '')
+      .trim();
+
+    // Find JSON object
     let parsedData: any = {};
     try {
       const firstBrace = textAnswer.indexOf('{');
       const lastBrace = textAnswer.lastIndexOf('}');
-      if (firstBrace !== -1 && lastBrace !== -1) {
-        parsedData = JSON.parse(textAnswer.substring(firstBrace, lastBrace + 1));
-        log("✅ JSON Parse Başarılı");
+
+      if (firstBrace !== -1 && lastBrace > firstBrace) {
+        const jsonString = textAnswer.substring(firstBrace, lastBrace + 1);
+        parsedData = JSON.parse(jsonString);
+        console.log("✅ JSON Parse Başarılı");
       } else {
-        log("⚠️ JSON Parantezleri Bulunamadı! Ham yanıt dönülüyor.");
-        return returnErrorAsSuccess("JSON Bulunamadı", textAnswer.substring(0, 100));
+        return returnError("JSON Bulunamadı", textAnswer.substring(0, 100));
       }
     } catch (e) {
-      log("❌ JSON Parse Hatası");
-      return returnErrorAsSuccess("JSON Parse Hatası", textAnswer.substring(0, 50));
+      return returnError("JSON Parse Hatası", textAnswer.substring(0, 100));
     }
 
-    // Başarılı Dönüş
-    const fallback = "İçerik üretilemedi.";
+    // Extract content - handle both flat and nested structures
+    const extractText = (obj: any, key: string): string => {
+      if (!obj) return "İçerik üretilemedi.";
 
-    return res.status(200).json({
-      logs: debugLogs,
-      twitter: parsedData.twitter || parsedData.twitterThread || fallback,
-      email: parsedData.email || parsedData.salesEmail || fallback,
-      instagram: parsedData.instagram || parsedData.instagramPost || fallback,
-      tiktok: parsedData.tiktok || parsedData.tiktokScript || fallback,
-      // Yedekler
-      twitterThread: parsedData.twitter || parsedData.twitterThread || fallback,
-      salesEmail: parsedData.email || parsedData.salesEmail || fallback,
-      instagramPost: parsedData.instagram || parsedData.instagramPost || fallback,
-      tiktokScript: parsedData.tiktok || parsedData.tiktokScript || fallback
-    });
+      const value = obj[key];
+      if (typeof value === 'string') return value;
+      if (typeof value === 'object' && value !== null) {
+        // Check for nested text property
+        return value.text || value.content || value.message || JSON.stringify(value);
+      }
+      return "İçerik üretilemedi.";
+    };
+
+    const finalResponse = {
+      twitter: extractText(parsedData, 'twitter'),
+      email: extractText(parsedData, 'email'),
+      instagram: extractText(parsedData, 'instagram'),
+      tiktok: extractText(parsedData, 'tiktok'),
+      twitterThread: extractText(parsedData, 'twitter'),
+      salesEmail: extractText(parsedData, 'email'),
+      instagramPost: extractText(parsedData, 'instagram'),
+      tiktokScript: extractText(parsedData, 'tiktok')
+    };
+
+    return res.status(200).json(finalResponse);
 
   } catch (error: any) {
-    return returnErrorAsSuccess("Sunucu İçi Hata", error.message);
+    return returnError("Sunucu Hatası", error.message);
   }
 }
