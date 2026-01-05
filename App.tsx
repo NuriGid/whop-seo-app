@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { WhopProduct, AnalysisResult } from './types';
 import ResultCard from './components/ResultCard';
 import Loader from './components/Loader';
@@ -14,7 +14,22 @@ interface AppState {
   analysisResult: AnalysisResult | null;
   isAnalyzing: boolean;
   analysisError: string | null;
+  isDropdownOpen: boolean;
 }
+
+// Document Icon Component
+const DocumentIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+  </svg>
+);
+
+// Book Icon Component
+const BookIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+  </svg>
+);
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>({
@@ -27,7 +42,10 @@ const App: React.FC = () => {
     analysisResult: null,
     isAnalyzing: false,
     analysisError: null,
+    isDropdownOpen: false,
   });
+
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Build default description template
   const buildDescriptionTemplate = (productName: string) => {
@@ -38,6 +56,17 @@ Please add a detailed description of this course, including:
 - Course features
 - Target audience`;
   };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setState(prev => ({ ...prev, isDropdownOpen: false }));
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Check if we're in Whop iframe and fetch products
   useEffect(() => {
@@ -72,17 +101,13 @@ Please add a detailed description of this course, including:
 
         const data = await response.json();
         const products: WhopProduct[] = data.data || [];
-        const initialSelected = products.length > 0 ? products[0] : null;
-        const initialDescription = initialSelected
-          ? buildDescriptionTemplate(initialSelected.name || initialSelected.title || 'Unknown')
-          : '';
 
         setState(prev => ({
           ...prev,
           isLoading: false,
           products,
-          selectedProduct: initialSelected,
-          courseDescription: initialDescription,
+          selectedProduct: null, // Start with no selection
+          courseDescription: '',
           productsError: null,
         }));
 
@@ -101,8 +126,7 @@ Please add a detailed description of this course, including:
   }, []);
 
   // Handle product selection
-  const handleSelectProduct = useCallback((productId: string) => {
-    const product = state.products.find(p => p.id === productId) || null;
+  const handleSelectProduct = useCallback((product: WhopProduct | null) => {
     const description = product
       ? buildDescriptionTemplate(product.name || product.title || 'Unknown')
       : '';
@@ -112,8 +136,14 @@ Please add a detailed description of this course, including:
       courseDescription: description,
       analysisResult: null,
       analysisError: null,
+      isDropdownOpen: false,
     }));
-  }, [state.products]);
+  }, []);
+
+  // Toggle dropdown
+  const toggleDropdown = useCallback(() => {
+    setState(prev => ({ ...prev, isDropdownOpen: !prev.isDropdownOpen }));
+  }, []);
 
   // Handle description change
   const handleDescriptionChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -189,7 +219,7 @@ Please add a detailed description of this course, including:
             Content Marketing Assistant
           </h1>
           <p className="text-gray-400 text-sm">
-            Select a course and get AI-powered marketing content for Twitter, Email, and Instagram.
+            Select a course and get AI-powered marketing content for Twitter, Email, Instagram, and TikTok.
           </p>
         </div>
 
@@ -208,73 +238,107 @@ Please add a detailed description of this course, including:
               <label className="block text-center text-gray-300 font-medium mb-4">
                 Select a Course
               </label>
-              <div className="relative">
-                <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-purple-400">
-                  {/* Book Icon */}
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                  </svg>
-                </div>
-                <select
-                  className="w-full bg-gray-900/80 border border-gray-600 text-white rounded-xl py-4 pl-12 pr-10 appearance-none focus:ring-2 focus:ring-purple-500 focus:border-transparent cursor-pointer"
-                  value={state.selectedProduct?.id || ''}
-                  onChange={(e) => handleSelectProduct(e.target.value)}
+
+              {/* Custom Dropdown */}
+              <div className="relative" ref={dropdownRef}>
+                {/* Dropdown Trigger */}
+                <button
+                  onClick={toggleDropdown}
+                  className="w-full bg-gray-900/80 border border-gray-600 text-white rounded-xl py-4 px-4 flex items-center justify-between focus:ring-2 focus:ring-purple-500 focus:border-transparent cursor-pointer hover:border-gray-500 transition-colors"
                 >
-                  {state.products.map(product => (
-                    <option key={product.id} value={product.id}>
-                      {product.name || product.title}
-                    </option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-400">
-                  <svg className="fill-current h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                    <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+                  <div className="flex items-center gap-3">
+                    <BookIcon className="h-5 w-5 text-purple-400" />
+                    <span className={state.selectedProduct ? 'text-white' : 'text-gray-400'}>
+                      {state.selectedProduct
+                        ? (state.selectedProduct.name || state.selectedProduct.title)
+                        : '-- Select a course --'}
+                    </span>
+                  </div>
+                  <svg
+                    className={`h-5 w-5 text-gray-400 transition-transform ${state.isDropdownOpen ? 'rotate-180' : ''}`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
-                </div>
+                </button>
+
+                {/* Dropdown Menu */}
+                {state.isDropdownOpen && (
+                  <div className="absolute top-full left-0 right-0 mt-2 bg-gray-800 border border-gray-600 rounded-xl overflow-hidden z-20 shadow-xl">
+                    {/* Placeholder Option */}
+                    <div
+                      className="px-4 py-3 text-gray-400 cursor-pointer hover:bg-gray-700/50 transition-colors"
+                      onClick={() => handleSelectProduct(null)}
+                    >
+                      -- Select a course --
+                    </div>
+
+                    {/* Product Options */}
+                    {state.products.map(product => (
+                      <div
+                        key={product.id}
+                        onClick={() => handleSelectProduct(product)}
+                        className={`px-4 py-3 flex items-center gap-3 cursor-pointer transition-colors ${state.selectedProduct?.id === product.id
+                            ? 'bg-indigo-600 text-white'
+                            : 'text-gray-300 hover:bg-gray-700/50'
+                          }`}
+                      >
+                        <DocumentIcon className="h-5 w-5 flex-shrink-0" />
+                        <span>{product.name || product.title}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Course Description Card */}
-            <div className="bg-gray-800/40 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-6 mb-6">
-              <label className="block text-center text-gray-300 font-medium mb-4">
-                Course Description (Auto-filled from selected course)
-              </label>
-              <textarea
-                className="w-full bg-gray-900/80 border border-gray-600 text-gray-200 rounded-xl p-4 min-h-[150px] resize-y focus:ring-2 focus:ring-purple-500 focus:border-transparent leading-relaxed"
-                value={state.courseDescription}
-                onChange={handleDescriptionChange}
-                placeholder="Enter course description..."
-              />
+            {/* Course Description Card - Only show when product selected */}
+            {state.selectedProduct && (
+              <div className="bg-gray-800/40 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-6 mb-6">
+                <label className="block text-center text-gray-300 font-medium mb-4">
+                  Course Description (Auto-filled from selected course)
+                </label>
+                <textarea
+                  className="w-full bg-gray-900/80 border border-gray-600 text-gray-200 rounded-xl p-4 min-h-[150px] resize-y focus:ring-2 focus:ring-purple-500 focus:border-transparent leading-relaxed"
+                  value={state.courseDescription}
+                  onChange={handleDescriptionChange}
+                  placeholder="Enter course description..."
+                />
+              </div>
+            )}
 
-              {/* Analyze Button */}
-              <button
-                onClick={handleAnalyze}
-                disabled={state.isAnalyzing || !state.courseDescription.trim()}
-                className="w-full mt-6 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-4 px-6 rounded-xl transition-all shadow-lg"
-              >
-                {state.isAnalyzing ? 'Analyzing...' : 'Analyze Content'}
-              </button>
-            </div>
+            {/* Generate Button */}
+            <button
+              onClick={handleAnalyze}
+              disabled={state.isAnalyzing || !state.selectedProduct || !state.courseDescription.trim()}
+              className="w-full bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-4 px-6 rounded-xl transition-all shadow-lg"
+            >
+              {state.isAnalyzing ? 'Generating...' : 'Generate Marketing Content'}
+            </button>
           </>
         )}
 
         {/* Analysis Loading */}
         {state.isAnalyzing && (
-          <div className="flex justify-center mb-8">
+          <div className="flex justify-center my-8">
             <Loader />
           </div>
         )}
 
         {/* Analysis Error */}
         {state.analysisError && (
-          <div className="bg-red-900/50 border border-red-700 rounded-xl p-4 mb-6">
+          <div className="bg-red-900/50 border border-red-700 rounded-xl p-4 my-6">
             <p className="text-red-300 font-medium">Error: {state.analysisError}</p>
           </div>
         )}
 
         {/* Analysis Results */}
         {state.analysisResult && (
-          <ResultCard result={state.analysisResult} />
+          <div className="mt-8">
+            <ResultCard result={state.analysisResult} />
+          </div>
         )}
       </div>
     </div>
