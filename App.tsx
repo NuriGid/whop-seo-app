@@ -186,10 +186,10 @@ Please add a detailed description of this course, including:
         {/* Header */}
         <div className="text-center mb-10">
           <h1 className="text-4xl font-bold italic bg-gradient-to-r from-purple-400 to-purple-600 bg-clip-text text-transparent mb-3">
-            Whop SEO Assistant
+            Content Marketing Assistant
           </h1>
           <p className="text-gray-400 text-sm">
-            Select a course and get AI-powered keyword and category suggestions.
+            Select a course and get AI-powered marketing content for Twitter, Email, and Instagram.
           </p>
         </div>
 
