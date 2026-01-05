@@ -266,7 +266,7 @@ Please add a detailed description of this course, including:
 
                 {/* Dropdown Menu */}
                 {state.isDropdownOpen && (
-                  <div className="absolute top-full left-0 right-0 mt-2 bg-gray-900 border border-gray-600 rounded-xl overflow-hidden z-50 shadow-2xl">
+                  <div className="absolute top-full left-0 right-0 mt-2 bg-gray-900 border border-gray-600 rounded-xl overflow-hidden z-[100] shadow-2xl">
                     {/* Placeholder Option */}
                     <div
                       className="px-4 py-3 text-gray-400 cursor-pointer hover:bg-gray-700/50 transition-colors"
