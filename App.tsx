@@ -301,7 +301,7 @@ Please add a detailed description of this course, including:
                   Course Description (Auto-filled from selected course)
                 </label>
                 <textarea
-                  className="w-full bg-gray-900 border border-gray-600 text-gray-200 rounded-xl p-4 min-h-[150px] resize-y focus:ring-2 focus:ring-purple-500 focus:border-transparent leading-relaxed"
+                  className="w-full bg-gray-900 border border-gray-600 text-gray-200 rounded-xl p-4 min-h-[200px] resize-y focus:ring-2 focus:ring-purple-500 focus:border-transparent leading-relaxed"
                   value={state.courseDescription}
                   onChange={handleDescriptionChange}
                   placeholder="Enter course description..."

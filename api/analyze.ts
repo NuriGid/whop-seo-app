@@ -1,6 +1,8 @@
 
 const GROQ_API_KEY = (process.env.GROQ_API_KEY || '').trim();
 
+const DELIMITER = '|||PART|||';
+
 export default async function handler(req: any, res: any) {
   // CORS
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -10,18 +12,18 @@ export default async function handler(req: any, res: any) {
 
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  // Helper to return error visible in UI fields
-  const returnError = (msg: string, details: string = '') => {
-    console.error(`❌ HATA: ${msg}`, details);
+  // Helper to return error
+  const returnError = (msg: string) => {
+    console.error(`❌ HATA: ${msg}`);
     return res.status(200).json({
-      twitter: `🔴 HATA: ${msg}`,
-      email: `🔴 HATA: ${msg}\n\nDetay: ${details}`,
-      instagram: `🔴 HATA: ${msg}`,
-      tiktok: `🔴 HATA: ${msg}`,
-      twitterThread: `🔴 HATA: ${msg}`,
-      salesEmail: `🔴 HATA: ${msg}\n\nDetay: ${details}`,
-      instagramPost: `🔴 HATA: ${msg}`,
-      tiktokScript: `🔴 HATA: ${msg}`
+      twitter: `⚠️ Hata: ${msg}`,
+      email: `⚠️ Hata: ${msg}`,
+      instagram: `⚠️ Hata: ${msg}`,
+      tiktok: `⚠️ Hata: ${msg}`,
+      twitterThread: `⚠️ Hata: ${msg}`,
+      salesEmail: `⚠️ Hata: ${msg}`,
+      instagramPost: `⚠️ Hata: ${msg}`,
+      tiktokScript: `⚠️ Hata: ${msg}`
     });
   };
 
@@ -29,11 +31,11 @@ export default async function handler(req: any, res: any) {
 
   try {
     if (!GROQ_API_KEY) {
-      return returnError('GROQ_API_KEY EKSİK', 'Vercel Env Variables kontrol edin.');
+      return returnError('GROQ_API_KEY eksik. Vercel ayarlarını kontrol edin.');
     }
 
     if (!req.body || !req.body.prompt) {
-      return returnError('Prompt verisi gelmedi');
+      return returnError('Prompt verisi gelmedi.');
     }
 
     const { prompt } = req.body;
@@ -52,82 +54,68 @@ export default async function handler(req: any, res: any) {
         messages: [
           {
             role: "system",
-            content: `You are a marketing content generator. Generate marketing content and return ONLY a valid JSON object (no markdown, no code blocks). 
+            content: `You are a marketing content generator. Generate content in plain text format.
             
-            Return exactly this structure:
-            {"twitter": "tweet text here", "email": "email text here", "instagram": "instagram caption here", "tiktok": "tiktok script here"}`
+IMPORTANT: Separate each section with exactly: ${DELIMITER}
+
+Format your response EXACTLY like this:
+[Twitter content here - 3-5 tweet thread]
+${DELIMITER}
+[Email content here - professional sales email]
+${DELIMITER}
+[Instagram caption here with hashtags]
+${DELIMITER}
+[TikTok script here - engaging video script]
+
+Do NOT use JSON. Do NOT use markdown code blocks. Just plain text with the delimiter between sections.`
           },
           {
             role: "user",
-            content: `Generate marketing content for this course. Return ONLY JSON, no markdown:
+            content: `Generate marketing content for this course:
             
-            ${prompt}`
+${prompt}
+
+Remember: Use ${DELIMITER} between each section (Twitter, Email, Instagram, TikTok).`
           }
         ],
-        temperature: 0.7
+        temperature: 0.7,
+        max_tokens: 2000
       })
     });
 
     if (!response.ok) {
       const errText = await response.text();
-      return returnError(`Groq API Hatası (${response.status})`, errText);
+      return returnError(`Groq API Hatası (${response.status}): ${errText.substring(0, 100)}`);
     }
 
     const data = await response.json();
-    let textAnswer = data.choices?.[0]?.message?.content || "{}";
+    const textAnswer = data.choices?.[0]?.message?.content || "";
 
-    console.log("📝 Ham Yanıt:", textAnswer.substring(0, 200));
+    console.log("📝 Ham Yanıt Uzunluğu:", textAnswer.length);
 
-    // Clean markdown code blocks if present
-    textAnswer = textAnswer
-      .replace(/```json\s*/gi, '')
-      .replace(/```\s*/g, '')
-      .trim();
+    // Split by delimiter
+    const parts = textAnswer.split(DELIMITER).map((p: string) => p.trim());
 
-    // Find JSON object
-    let parsedData: any = {};
-    try {
-      const firstBrace = textAnswer.indexOf('{');
-      const lastBrace = textAnswer.lastIndexOf('}');
+    // Fallback for partial responses
+    const twitter = parts[0] || "İçerik oluşturulamadı. Lütfen tekrar deneyin.";
+    const email = parts[1] || "İçerik oluşturulamadı. Lütfen tekrar deneyin.";
+    const instagram = parts[2] || "İçerik oluşturulamadı. Lütfen tekrar deneyin.";
+    const tiktok = parts[3] || "İçerik oluşturulamadı. Lütfen tekrar deneyin.";
 
-      if (firstBrace !== -1 && lastBrace > firstBrace) {
-        const jsonString = textAnswer.substring(firstBrace, lastBrace + 1);
-        parsedData = JSON.parse(jsonString);
-        console.log("✅ JSON Parse Başarılı");
-      } else {
-        return returnError("JSON Bulunamadı", textAnswer.substring(0, 100));
-      }
-    } catch (e) {
-      return returnError("JSON Parse Hatası", textAnswer.substring(0, 100));
-    }
+    console.log(`✅ Parsed ${parts.length} sections`);
 
-    // Extract content - handle both flat and nested structures
-    const extractText = (obj: any, key: string): string => {
-      if (!obj) return "İçerik üretilemedi.";
-
-      const value = obj[key];
-      if (typeof value === 'string') return value;
-      if (typeof value === 'object' && value !== null) {
-        // Check for nested text property
-        return value.text || value.content || value.message || JSON.stringify(value);
-      }
-      return "İçerik üretilemedi.";
-    };
-
-    const finalResponse = {
-      twitter: extractText(parsedData, 'twitter'),
-      email: extractText(parsedData, 'email'),
-      instagram: extractText(parsedData, 'instagram'),
-      tiktok: extractText(parsedData, 'tiktok'),
-      twitterThread: extractText(parsedData, 'twitter'),
-      salesEmail: extractText(parsedData, 'email'),
-      instagramPost: extractText(parsedData, 'instagram'),
-      tiktokScript: extractText(parsedData, 'tiktok')
-    };
-
-    return res.status(200).json(finalResponse);
+    return res.status(200).json({
+      twitter,
+      email,
+      instagram,
+      tiktok,
+      twitterThread: twitter,
+      salesEmail: email,
+      instagramPost: instagram,
+      tiktokScript: tiktok
+    });
 
   } catch (error: any) {
-    return returnError("Sunucu Hatası", error.message);
+    return returnError(`Sunucu hatası: ${error.message}`);
   }
 }
