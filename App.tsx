@@ -266,7 +266,7 @@ Please add a detailed description of this course, including:
 
                 {/* Dropdown Menu */}
                 {state.isDropdownOpen && (
-                  <div className="absolute top-full left-0 right-0 mt-2 bg-gray-800 border border-gray-600 rounded-xl overflow-hidden z-20 shadow-xl">
+                  <div className="absolute top-full left-0 right-0 mt-2 bg-gray-900 border border-gray-600 rounded-xl overflow-hidden z-50 shadow-2xl">
                     {/* Placeholder Option */}
                     <div
                       className="px-4 py-3 text-gray-400 cursor-pointer hover:bg-gray-700/50 transition-colors"
@@ -281,8 +281,8 @@ Please add a detailed description of this course, including:
                         key={product.id}
                         onClick={() => handleSelectProduct(product)}
                         className={`px-4 py-3 flex items-center gap-3 cursor-pointer transition-colors ${state.selectedProduct?.id === product.id
-                            ? 'bg-indigo-600 text-white'
-                            : 'text-gray-300 hover:bg-gray-700/50'
+                          ? 'bg-indigo-600 text-white'
+                          : 'text-gray-300 hover:bg-gray-700/50'
                           }`}
                       >
                         <DocumentIcon className="h-5 w-5 flex-shrink-0" />
@@ -301,22 +301,22 @@ Please add a detailed description of this course, including:
                   Course Description (Auto-filled from selected course)
                 </label>
                 <textarea
-                  className="w-full bg-gray-900/80 border border-gray-600 text-gray-200 rounded-xl p-4 min-h-[150px] resize-y focus:ring-2 focus:ring-purple-500 focus:border-transparent leading-relaxed"
+                  className="w-full bg-gray-900 border border-gray-600 text-gray-200 rounded-xl p-4 min-h-[150px] resize-y focus:ring-2 focus:ring-purple-500 focus:border-transparent leading-relaxed"
                   value={state.courseDescription}
                   onChange={handleDescriptionChange}
                   placeholder="Enter course description..."
                 />
+
+                {/* Generate Button - Inside Card */}
+                <button
+                  onClick={handleAnalyze}
+                  disabled={state.isAnalyzing || !state.courseDescription.trim()}
+                  className="w-full mt-6 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-4 px-6 rounded-xl transition-all shadow-lg"
+                >
+                  {state.isAnalyzing ? 'Generating...' : 'Generate Marketing Content'}
+                </button>
               </div>
             )}
-
-            {/* Generate Button */}
-            <button
-              onClick={handleAnalyze}
-              disabled={state.isAnalyzing || !state.selectedProduct || !state.courseDescription.trim()}
-              className="w-full bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-4 px-6 rounded-xl transition-all shadow-lg"
-            >
-              {state.isAnalyzing ? 'Generating...' : 'Generate Marketing Content'}
-            </button>
           </>
         )}
 
