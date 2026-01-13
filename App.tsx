@@ -296,7 +296,7 @@ Please add a detailed description of this course, including:
 
             {/* Course Description Card - Only show when product selected */}
             {state.selectedProduct && (
-              <div className="bg-gray-800/40 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-6 mb-6">
+              <div className="relative z-10 bg-gray-800/40 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-6 mb-6">
                 <label className="block text-center text-gray-300 font-medium mb-4">
                   Course Description (Auto-filled from selected course)
                 </label>
