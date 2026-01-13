@@ -64,7 +64,7 @@ export default async function handler(req: any, res: any) {
         const cleanProducts = Array.isArray(allProducts) ? allProducts.filter((p: any) => {
             if (!p.id || !p.name) return false;
             const name = p.name.trim().toLowerCase();
-            const blacklistedTerms = ['benim uygulamam', 'seo assistant', 'crypto trading fu'];
+            const blacklistedTerms = ['benim uygulamam', 'seo assistant'];
             if (blacklistedTerms.some(term => name.includes(term))) return false;
             if (p.visibility === 'hidden' || p.visibility === 'archived' || p.status === 'deleted') return false;
             return true;
