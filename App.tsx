@@ -1,345 +1,178 @@
-
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { WhopProduct, AnalysisResult } from './types';
+import React, { useState, useEffect } from 'react';
+// @ts-ignore
+import { WhopApp } from '@whop-apps/sdk';
 import ResultCard from './components/ResultCard';
-import Loader from './components/Loader';
-
-interface AppState {
-  isLoading: boolean;
-  isInWhop: boolean;
-  products: WhopProduct[];
-  productsError: string | null;
-  selectedProduct: WhopProduct | null;
-  courseDescription: string;
-  analysisResult: AnalysisResult | null;
-  isAnalyzing: boolean;
-  analysisError: string | null;
-  isDropdownOpen: boolean;
-}
-
-// Document Icon Component
-const DocumentIcon: React.FC<{ className?: string }> = ({ className }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-  </svg>
-);
-
-// Book Icon Component
-const BookIcon: React.FC<{ className?: string }> = ({ className }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-  </svg>
-);
+import { analyzeCourseText } from './services/geminiService';
+import { AnalysisResult, WhopProduct } from './types';
 
 const App: React.FC = () => {
-  const [state, setState] = useState<AppState>({
-    isLoading: true,
-    isInWhop: false,
-    products: [],
-    productsError: null,
-    selectedProduct: null,
-    courseDescription: '',
-    analysisResult: null,
-    isAnalyzing: false,
-    analysisError: null,
-    isDropdownOpen: false,
-  });
+  const [courseText, setCourseText] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [products, setProducts] = useState<WhopProduct[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState<string>('');
+  const [loadingProducts, setLoadingProducts] = useState(true);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  // Build default description template
-  const buildDescriptionTemplate = (productName: string) => {
-    return `Course: ${productName}
-
-Please add a detailed description of this course, including:
-- What students will learn
-- Course features
-- Target audience`;
-  };
-
-  // Close dropdown when clicking outside
+  // 1. SDK GİRİŞ
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setState(prev => ({ ...prev, isDropdownOpen: false }));
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  // Check if we're in Whop iframe and fetch products
-  useEffect(() => {
-    const init = async () => {
-      const isInIframe = window !== window.parent;
-
-      if (!isInIframe) {
-        setState(prev => ({
-          ...prev,
-          isLoading: false,
-          isInWhop: false,
-          productsError: 'This app must be opened from within Whop.',
-        }));
-        return;
-      }
-
-      setState(prev => ({ ...prev, isInWhop: true }));
-
+    const initWhop = async () => {
       try {
-        console.log('📦 Fetching products...');
+        const SDK = WhopApp as any;
+        await SDK.connect();
+        const token = await SDK.getAccessToken();
 
-        const response = await fetch('/api/products', {
-          method: 'GET',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.message || errorData.error || `Error ${response.status}`);
+        if (!token) {
+          setError("Lütfen uygulamayı Whop panelinden açın (Authentication Required).");
+          setLoadingProducts(false);
+          return;
         }
 
-        const data = await response.json();
-        const products: WhopProduct[] = data.data || [];
+        await fetchProducts(token);
 
-        setState(prev => ({
-          ...prev,
-          isLoading: false,
-          products,
-          selectedProduct: null, // Start with no selection
-          courseDescription: '',
-          productsError: null,
-        }));
-
-      } catch (error) {
-        console.error('❌ Failed to fetch products:', error);
-        setState(prev => ({
-          ...prev,
-          isLoading: false,
-          products: [],
-          productsError: error instanceof Error ? error.message : 'Failed to load products',
-        }));
+      } catch (err: any) {
+        console.error("SDK Hatası:", err);
+        setError('Bağlantı hatası: Uygulama Whop ile konuşamıyor.');
+        setLoadingProducts(false);
       }
     };
 
-    init();
+    initWhop();
   }, []);
 
-  // Handle product selection
-  const handleSelectProduct = useCallback((product: WhopProduct | null) => {
-    const description = product
-      ? buildDescriptionTemplate(product.name || product.title || 'Unknown')
-      : '';
-    setState(prev => ({
-      ...prev,
-      selectedProduct: product,
-      courseDescription: description,
-      analysisResult: null,
-      analysisError: null,
-      isDropdownOpen: false,
-    }));
-  }, []);
-
-  // Toggle dropdown
-  const toggleDropdown = useCallback(() => {
-    setState(prev => ({ ...prev, isDropdownOpen: !prev.isDropdownOpen }));
-  }, []);
-
-  // Handle description change
-  const handleDescriptionChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setState(prev => ({ ...prev, courseDescription: e.target.value }));
-  }, []);
-
-  // Handle analysis
-  const handleAnalyze = useCallback(async () => {
-    if (!state.selectedProduct || !state.courseDescription.trim()) return;
-
-    setState(prev => ({ ...prev, isAnalyzing: true, analysisError: null }));
-
+  const fetchProducts = async (token: string) => {
     try {
-      const response = await fetch('/api/analyze', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: state.courseDescription })
+      const response = await fetch('/api/products', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
       });
 
+      if (!response.ok) throw new Error('Ürünler yüklenemedi.');
+
+      const data = await response.json();
+      const productList = Array.isArray(data) ? data : (data.data || []);
+      setProducts(productList);
+
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoadingProducts(false);
+    }
+  };
+
+  // 2. ÜRÜN SEÇİMİ
+  const handleProductSelect = (productId: string) => {
+    setSelectedProduct(productId);
+    setIsDropdownOpen(false);
+    setError(null);
+    setResult(null);
+
+    const product = products.find(p => p.id === productId);
+
+    if (product) {
+      const initialText = product.description && product.description.trim().length > 0
+        ? product.description
+        : `Kurs Adı: ${product.name}\n\n(Bu kursun Whop'ta açıklaması yok. Lütfen buraya kurs hakkında kısa bilgi girin...)`;
+
+      setCourseText(initialText);
+    }
+  };
+
+  // 3. ANALİZ İŞLEMİ
+  const handleAnalyzeClick = async () => {
+    if (!courseText.trim()) {
+      setError("Lütfen kutuya analiz edilecek bir metin girin.");
+      return;
+    }
+
+    setIsLoading(true);
+    setResult(null);
+    setError(null);
+
+    try {
+      console.log("🚀 Analiz başlatılıyor...");
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: courseText }),
+      });
+
+      const data = await response.json();
+
       if (!response.ok) {
-        throw new Error(`Analysis Failed (${response.status})`);
+        throw new Error(data.error || `Sunucu Hatası: ${response.status}`);
       }
 
-      const result = await response.json();
+      setResult(data);
 
-      const finalResult: AnalysisResult = {
-        twitterThread: result.twitterThread || result.twitter || "No content generated.",
-        salesEmail: result.salesEmail || result.email || "No content generated.",
-        instagramPost: result.instagramPost || result.instagram || "No content generated.",
-        tiktokScript: result.tiktokScript || result.tiktok || "No content generated."
-      };
-
-      setState(prev => ({
-        ...prev,
-        isAnalyzing: false,
-        analysisResult: finalResult,
-      }));
-
-    } catch (error) {
-      console.error('❌ Analysis Error:', error);
-      setState(prev => ({
-        ...prev,
-        isAnalyzing: false,
-        analysisError: error instanceof Error ? error.message : 'Analysis failed',
-      }));
+    } catch (err: any) {
+      setError('Analiz hatası: ' + (err.message || "Bilinmeyen bir hata oluştu."));
+    } finally {
+      setIsLoading(false);
     }
-  }, [state.selectedProduct, state.courseDescription]);
+  };
 
-  // Loading state
-  if (state.isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-900 via-gray-900 to-black">
-        <Loader />
-      </div>
-    );
-  }
+  const handleUpdateProduct = async () => {
+    if (!result) return;
+    const textToCopy = `🎯 İÇERİK\n\n📱 TWITTER:\n${result.twitter}\n\n📧 EMAIL:\n${result.email}\n\n📸 INSTAGRAM:\n${result.instagram}\n\n🎬 TIKTOK:\n${result.tiktok}`;
+    try { await navigator.clipboard.writeText(textToCopy); alert('Kopyalandı!'); } catch (e) { }
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-900 to-black text-gray-100 p-6 relative overflow-hidden">
-      {/* Stars Background Effect */}
-      <div className="absolute inset-0 opacity-30 pointer-events-none">
-        <div className="absolute top-10 left-20 w-1 h-1 bg-white rounded-full"></div>
-        <div className="absolute top-32 right-40 w-1 h-1 bg-white rounded-full"></div>
-        <div className="absolute top-64 left-1/3 w-1 h-1 bg-white rounded-full"></div>
-        <div className="absolute bottom-40 right-20 w-1 h-1 bg-white rounded-full"></div>
-      </div>
+    <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center p-4 sm:p-8 font-sans">
+      <div className="w-full max-w-2xl text-center">
+        <h1 className="text-4xl font-bold text-indigo-400 mb-2">Content Marketing Assistant</h1>
 
-      <div className="max-w-2xl mx-auto relative z-10">
-        {/* Header */}
-        <div className="text-center mb-10">
-          <h1 className="text-4xl font-bold italic bg-gradient-to-r from-purple-400 to-purple-600 bg-clip-text text-transparent mb-3">
-            Content Marketing Assistant
-          </h1>
-          <p className="text-gray-400 text-sm">
-            Select a course and get AI-powered marketing content for Twitter, Email, Instagram, and TikTok.
-          </p>
-        </div>
+        <div className="space-y-6 mt-8">
+          {/* KURS SEÇİMİ - Z-INDEX DÜZELTİLDİ (z-50 -> z-[100]) */}
+          <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 relative z-[100]">
+            <label className="block text-sm font-medium text-gray-300 mb-2">Kurs Seçin</label>
 
-        {/* Error Display */}
-        {state.productsError && (
-          <div className="bg-red-900/50 border border-red-700 rounded-xl p-4 mb-6">
-            <p className="text-red-300">{state.productsError}</p>
-          </div>
-        )}
-
-        {/* Main Content */}
-        {state.products.length > 0 && (
-          <>
-            {/* Select Course Card */}
-            <div className="bg-gray-800/40 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-6 mb-6">
-              <label className="block text-center text-gray-300 font-medium mb-4">
-                Select a Course
-              </label>
-
-              {/* Custom Dropdown */}
-              <div className="relative" ref={dropdownRef}>
-                {/* Dropdown Trigger */}
-                <button
-                  onClick={toggleDropdown}
-                  className="w-full bg-gray-900/80 border border-gray-600 text-white rounded-xl py-4 px-4 flex items-center justify-between focus:ring-2 focus:ring-purple-500 focus:border-transparent cursor-pointer hover:border-gray-500 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <BookIcon className="h-5 w-5 text-purple-400" />
-                    <span className={state.selectedProduct ? 'text-white' : 'text-gray-400'}>
-                      {state.selectedProduct
-                        ? (state.selectedProduct.name || state.selectedProduct.title)
-                        : '-- Select a course --'}
-                    </span>
-                  </div>
-                  <svg
-                    className={`h-5 w-5 text-gray-400 transition-transform ${state.isDropdownOpen ? 'rotate-180' : ''}`}
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
+            {loadingProducts ? (
+              <div className="text-gray-400">Yükleniyor...</div>
+            ) : (
+              <div className="relative custom-dropdown">
+                <button onClick={() => setIsDropdownOpen(!isDropdownOpen)} className="w-full p-3 bg-gray-900 border border-gray-600 rounded-xl flex justify-between items-center">
+                  <span>{products.find(p => p.id === selectedProduct)?.name || '-- Seçiniz --'}</span>
+                  <span className="text-gray-400">▼</span>
                 </button>
-
-                {/* Dropdown Menu */}
-                {state.isDropdownOpen && (
-                  <div className="absolute top-full left-0 right-0 mt-2 bg-gray-900 border border-gray-600 rounded-xl overflow-hidden z-[100] shadow-2xl">
-                    {/* Placeholder Option */}
-                    <div
-                      className="px-4 py-3 text-gray-400 cursor-pointer hover:bg-gray-700/50 transition-colors"
-                      onClick={() => handleSelectProduct(null)}
-                    >
-                      -- Select a course --
-                    </div>
-
-                    {/* Product Options */}
-                    {state.products.map(product => (
-                      <div
-                        key={product.id}
-                        onClick={() => handleSelectProduct(product)}
-                        className={`px-4 py-3 flex items-center gap-3 cursor-pointer transition-colors ${state.selectedProduct?.id === product.id
-                          ? 'bg-indigo-600 text-white'
-                          : 'text-gray-300 hover:bg-gray-700/50'
-                          }`}
-                      >
-                        <DocumentIcon className="h-5 w-5 flex-shrink-0" />
-                        <span>{product.name || product.title}</span>
+                {isDropdownOpen && (
+                  <div className="absolute w-full mt-2 bg-gray-900 border border-gray-700 rounded-xl max-h-60 overflow-y-auto shadow-xl z-[101]">
+                    {products.map((p) => (
+                      <div key={p.id} onClick={() => handleProductSelect(p.id)} className="p-3 hover:bg-indigo-600/20 cursor-pointer border-b border-gray-800 last:border-0">
+                        {p.name}
                       </div>
                     ))}
+                    {products.length === 0 && <div className="p-3 text-gray-500">Kurs bulunamadı.</div>}
                   </div>
                 )}
               </div>
-            </div>
-
-            {/* Course Description Card - Only show when product selected */}
-            {state.selectedProduct && (
-              <div className="relative z-10 bg-gray-800/40 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-6 mb-6">
-                <label className="block text-center text-gray-300 font-medium mb-4">
-                  Course Description (Auto-filled from selected course)
-                </label>
-                <textarea
-                  className="w-full bg-gray-900 border border-gray-600 text-gray-200 rounded-xl p-4 min-h-[200px] resize-y focus:ring-2 focus:ring-purple-500 focus:border-transparent leading-relaxed"
-                  value={state.courseDescription}
-                  onChange={handleDescriptionChange}
-                  placeholder="Enter course description..."
-                />
-
-                {/* Generate Button - Inside Card */}
-                <button
-                  onClick={handleAnalyze}
-                  disabled={state.isAnalyzing || !state.courseDescription.trim()}
-                  className="w-full mt-6 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-4 px-6 rounded-xl transition-all shadow-lg"
-                >
-                  {state.isAnalyzing ? 'Generating...' : 'Generate Marketing Content'}
-                </button>
-              </div>
             )}
-          </>
-        )}
-
-        {/* Analysis Loading */}
-        {state.isAnalyzing && (
-          <div className="flex justify-center my-8">
-            <Loader />
           </div>
-        )}
 
-        {/* Analysis Error */}
-        {state.analysisError && (
-          <div className="bg-red-900/50 border border-red-700 rounded-xl p-4 my-6">
-            <p className="text-red-300 font-medium">Error: {state.analysisError}</p>
+          {/* İÇERİK GİRİŞİ - Z-INDEX DÜŞÜRÜLDÜ (Varsayılan) */}
+          <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 relative z-0">
+            <textarea
+              className="w-full h-40 p-3 bg-gray-900 border border-gray-600 rounded-md text-white"
+              placeholder="İçerik..." value={courseText} onChange={(e) => setCourseText(e.target.value)} />
+            <button onClick={handleAnalyzeClick} disabled={isLoading || !courseText.trim()} className="mt-4 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-md">
+              {isLoading ? 'Üretiliyor...' : 'İçerik Üret'}
+            </button>
           </div>
-        )}
 
-        {/* Analysis Results */}
-        {state.analysisResult && (
-          <div className="mt-8">
-            <ResultCard result={state.analysisResult} />
-          </div>
-        )}
+          {error && <div className="text-red-400 bg-red-900/20 p-4 rounded font-bold border border-red-500">{error}</div>}
+
+          {result && (
+            <>
+              <ResultCard result={result} />
+              <button onClick={handleUpdateProduct} className="w-full bg-green-600 py-3 rounded-md font-bold text-white">Tümünü Kopyala</button>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
