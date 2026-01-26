@@ -18,7 +18,8 @@ export default async function handler(req: any, res: any) {
         // IMPORTANT: 'WHOP_API_KEY' in .env must be your APP KEY (starts with 'app_'), NOT a Company Key.
         // This is safe because we only use it after validating the user's token.
         const whop = new WhopSDK({
-            apiKey: process.env.WHOP_API_KEY
+            apiKey: process.env.WHOP_API_KEY,
+            appID: process.env.WHOP_APP_ID // Required for verifyUserToken
         });
 
         // 3. EXTRACT USER TOKEN
