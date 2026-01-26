@@ -121,7 +121,12 @@ const App: React.FC = () => {
       const companyId = urlParams.get('company_id') || urlParams.get('companyId');
 
       if (!token) {
-        setState(prev => ({ ...prev, isLoading: false, productsError: "Could not identify user. Please refresh inside Whop." }));
+        console.error("❌ No user token found in URL parameters.", window.location.href);
+        setState(prev => ({
+          ...prev,
+          isLoading: false,
+          productsError: `Could not identify user. URL: ${window.location.href}`
+        }));
         return;
       }
 
@@ -249,8 +254,8 @@ const App: React.FC = () => {
                 key={tab}
                 onClick={() => setState(prev => ({ ...prev, activeTab: tab }))}
                 className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${state.activeTab === tab
-                    ? 'bg-purple-600 text-white shadow-lg'
-                    : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+                  ? 'bg-purple-600 text-white shadow-lg'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
                   }`}
               >
                 {tab === 'content' ? 'Content Generator' : tab.charAt(0).toUpperCase() + tab.slice(1)}
