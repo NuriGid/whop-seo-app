@@ -45,23 +45,20 @@ app.get('/api/payments/:id/fees', (req, res) => paymentFeesHandler(req, res));
 app.post('/api/analyze', async (req, res) => {
   try {
     // 🔐 STRICT AUTH ENFORCEMENT - NO FALLBACKS
-    const authHeader = req.headers.authorization;
+    // 🔐 STRICT AUTH ENFORCEMENT
+    let authHeader = req.headers.authorization || req.headers['x-whop-user-token'];
 
-    if (!authHeader || typeof authHeader !== 'string') {
-      console.error('❌ AUTH_REQUIRED: No Authorization header');
+    if (!authHeader) {
+      console.error('❌ AUTH_REQUIRED: No Authorization or x-whop-user-token header');
       return res.status(401).json({
         error: 'AUTH_REQUIRED',
         message: 'Authorization header is required. Please open this app inside Whop.',
       });
     }
 
-    if (!authHeader.startsWith('Bearer ')) {
-      console.error('❌ INVALID_TOKEN: Authorization header must be Bearer token');
-      return res.status(401).json({
-        error: 'INVALID_TOKEN',
-        message: 'Authorization header must be a Bearer token.',
-      });
-    }
+    // Normalize
+    if (Array.isArray(authHeader)) authHeader = authHeader[0];
+    if (!authHeader.startsWith('Bearer ')) authHeader = `Bearer ${authHeader}`;
 
     console.log('✅ Authenticated request for analyze');
 

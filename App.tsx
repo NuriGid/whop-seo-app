@@ -94,12 +94,16 @@ const App: React.FC = () => {
   }, []);
 
   // Fetch Logic Helper
-  const fetchData = async (endpoint: string, token: string, companyId: string | null) => {
+  const fetchData = async (endpoint: string, token: string | null, companyId: string | null) => {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
     };
-    if (companyId) headers['X-Whop-Company-Id'] = companyId;
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    if (companyId) {
+      headers['X-Whop-Company-Id'] = companyId;
+    }
 
     const response = await fetch(endpoint, { method: 'GET', headers });
     if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
@@ -118,10 +122,20 @@ const App: React.FC = () => {
 
       const urlParams = new URLSearchParams(window.location.search);
       const token = urlParams.get('x-whop-user-token') || urlParams.get('token');
-      const companyId = urlParams.get('company_id') || urlParams.get('companyId');
 
-      if (!token) {
-        console.error("❌ No user token found in URL parameters.", window.location.href);
+      // Extract company ID from params OR path (for Proxy Apps)
+      let companyId = urlParams.get('company_id') || urlParams.get('companyId');
+      if (!companyId) {
+        const pathMatch = window.location.pathname.match(/biz_[a-zA-Z0-9]+/);
+        if (pathMatch) companyId = pathMatch[0];
+      }
+
+      // If no token in URL, we assume we are running behind Whop Proxy (apps.whop.com)
+      // which acts as an authenticated gateway and injects request headers associated with the user.
+      const isProxy = window.location.hostname.includes('apps.whop.com');
+
+      if (!token && !isProxy) {
+        console.error("❌ No user token found and not on Whop Proxy.", window.location.href);
         setState(prev => ({
           ...prev,
           isLoading: false,
@@ -196,7 +210,10 @@ const App: React.FC = () => {
     if (!state.selectedProduct || !state.courseDescription.trim()) return;
     setState(prev => ({ ...prev, isAnalyzing: true, analysisError: null }));
     try {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.userToken}` };
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (state.userToken) {
+        headers['Authorization'] = `Bearer ${state.userToken}`;
+      }
       if (state.companyId) headers['X-Whop-Company-Id'] = state.companyId;
 
       const response = await fetch('/api/analyze', { method: 'POST', headers, body: JSON.stringify({ prompt: state.courseDescription }) });
