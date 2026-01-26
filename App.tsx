@@ -151,9 +151,9 @@ const App: React.FC = () => {
         const products = await fetchData('/api/products', token, companyId);
         setState(prev => ({ ...prev, isLoading: false, isLoadingProducts: false, products }));
         fetchedTabs.current.add('content');
-      } catch (error) {
+      } catch (error: any) {
         console.error('Initial product fetch failed', error);
-        setState(prev => ({ ...prev, isLoading: false, isLoadingProducts: false, productsError: 'Failed to load products.' }));
+        setState(prev => ({ ...prev, isLoading: false, isLoadingProducts: false, productsError: error.message || 'Failed to load products.' }));
       }
     };
     init();
@@ -256,30 +256,19 @@ const App: React.FC = () => {
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold italic bg-gradient-to-r from-purple-400 to-purple-600 bg-clip-text text-transparent mb-3">
-            Whop Business Manager
+            Content Marketing Assistant
           </h1>
           <p className="text-gray-400 text-sm">
-            Analyze courses, view plans, and track payments.
+            Generate AI-powered marketing content for your Whop courses.
           </p>
         </div>
 
-        {/* Navigation Tabs */}
+        {/* Navigation Tabs (Removed for single-purpose Content App) */}
+        {/* 
         <div className="flex justify-center mb-8">
-          <div className="bg-gray-800/60 p-1 rounded-xl flex gap-1 border border-gray-700">
-            {(['content', 'plans', 'payments'] as const).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setState(prev => ({ ...prev, activeTab: tab }))}
-                className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${state.activeTab === tab
-                  ? 'bg-purple-600 text-white shadow-lg'
-                  : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
-                  }`}
-              >
-                {tab === 'content' ? 'Content Generator' : tab.charAt(0).toUpperCase() + tab.slice(1)}
-              </button>
-            ))}
-          </div>
-        </div>
+           ... (Tabs removed)
+        </div> 
+        */}
 
         {/* Error Display */}
         {state.productsError && (
@@ -349,31 +338,7 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {/* --- PLANS TAB --- */}
-        {state.activeTab === 'plans' && (
-          <div className="animate-fade-in">
-            {state.isLoadingPlans ? (
-              <div className="flex justify-center py-20"><Loader /></div>
-            ) : (
-              <PlansTable plans={state.plans} />
-            )}
-          </div>
-        )}
-
-        {/* --- PAYMENTS TAB --- */}
-        {state.activeTab === 'payments' && (
-          <div className="animate-fade-in">
-            {state.isLoadingPayments ? (
-              <div className="flex justify-center py-20"><Loader /></div>
-            ) : (
-              <PaymentsTable
-                payments={state.payments}
-                userToken={state.userToken}
-                companyId={state.companyId}
-              />
-            )}
-          </div>
-        )}
+        {/* --- PLANS & PAYMENTS REMOVED --- */}
 
       </div>
     </div>
