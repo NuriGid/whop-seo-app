@@ -70,19 +70,18 @@ export default async function handler(req: any, res: any) {
 
         // 7. FETCH PRODUCTS
         const productResponse = await whop.products.list({ company_id: companyId });
+
+        // Debug: Log raw response
+        console.log(`📦 Raw product response:`, JSON.stringify(productResponse, null, 2));
+
         const allProducts = (productResponse as any).data ||
             (Array.isArray(productResponse) ? productResponse : []);
 
-        // 8. FILTER
-        const cleanProducts = allProducts.filter((p: any) => {
-            const name = p.name || p.title;
-            if (!name || name.trim() === '') return false;
-            if (p.visibility === 'hidden' || p.status === 'archived') return false;
-            return true;
-        });
+        console.log(`📦 Found ${allProducts.length} total products`);
 
-        console.log(`✅ Returning ${cleanProducts.length} products`);
-        return res.status(200).json(cleanProducts);
+        // 8. RETURN ALL - No filtering for now (debug)
+        console.log(`✅ Returning ${allProducts.length} products`);
+        return res.status(200).json(allProducts);
 
     } catch (error: any) {
         console.error("❌ API Error:", error.message);
