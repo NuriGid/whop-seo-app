@@ -5,7 +5,7 @@ export default async function handler(req: any, res: any) {
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-    res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization, x-whop-user-token');
+    res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization, x-whop-user-token, x-whop-company-id');
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
 
     if (req.method === 'OPTIONS') {
@@ -14,18 +14,32 @@ export default async function handler(req: any, res: any) {
     }
 
     try {
-        // 2. INITIALIZE SDK WITH APP KEY
+        // 2. INITIALIZE SDK
         const whop = new WhopSDK({
             apiKey: process.env.WHOP_API_KEY,
             appID: process.env.WHOP_APP_ID || process.env.NEXT_PUBLIC_WHOP_APP_ID
         });
 
-        // 3. VERIFY USER TOKEN (Get userId from headers)
-        // The SDK extracts x-whop-user-token from headers automatically
-        const tokenResult = await whop.verifyUserToken(req.headers as any);
+        // 3. CONVERT HEADERS TO WEB API FORMAT
+        // Whop SDK expects Headers (Web API) format, not Node.js IncomingHttpHeaders
+        const webHeaders = new Headers();
+        for (const [key, value] of Object.entries(req.headers)) {
+            if (typeof value === 'string') {
+                webHeaders.set(key, value);
+            } else if (Array.isArray(value)) {
+                webHeaders.set(key, value[0]);
+            }
+        }
+
+        // Debug: Log important headers
+        console.log('🔍 x-whop-user-token:', webHeaders.get('x-whop-user-token') ? 'Present' : 'MISSING');
+        console.log('🔍 x-whop-company-id:', webHeaders.get('x-whop-company-id') ? 'Present' : 'MISSING');
+
+        // 4. VERIFY USER TOKEN
+        const tokenResult = await whop.verifyUserToken(webHeaders);
 
         if (!tokenResult || !tokenResult.userId) {
-            console.error("❌ Auth Failed: Could not verify user token");
+            console.error("❌ Auth Failed: No userId in token result");
             return res.status(401).json({
                 error: 'Authentication failed. Please open this app inside Whop Dashboard.'
             });
@@ -34,43 +48,32 @@ export default async function handler(req: any, res: any) {
         const userId = tokenResult.userId;
         console.log(`✅ User verified: ${userId}`);
 
-        // 4. GET COMPANY ID FROM HEADERS OR TOKEN
-        // The company context is passed via headers by the Whop iframe
-        const companyId = req.headers['x-whop-company-id'] ||
-            (tokenResult as any).companyId ||
-            (tokenResult as any).company_id;
+        // 5. GET COMPANY ID
+        const companyId = webHeaders.get('x-whop-company-id');
 
         if (!companyId) {
-            console.error("❌ No company ID found in request");
+            console.error("❌ No x-whop-company-id header");
             return res.status(403).json({
-                error: 'Company ID not found. Please ensure app is installed on your company.'
+                error: 'Company ID not found. Ensure app is accessed from Whop Dashboard.'
             });
         }
 
-        // 5. CHECK USER ACCESS TO COMPANY (Security validation) 
-        // This confirms the user actually has access to this company
-        try {
-            const access = await whop.users.checkAccess(companyId, { id: userId });
-            console.log(`✅ Access confirmed for user ${userId} to company ${companyId}`);
-        } catch (accessError: any) {
-            console.error("❌ Access check failed:", accessError.message);
-            return res.status(403).json({
-                error: 'User does not have access to this company.'
-            });
+        // 6. CHECK ACCESS
+        const access = await whop.users.checkAccess(companyId, { id: userId });
+
+        if (!access.has_access) {
+            console.error("❌ User does not have access to company");
+            return res.status(403).json({ error: 'Access denied to this company.' });
         }
 
-        // 6. FETCH PRODUCTS (Scoped to validated company)
-        // Now safe to fetch - we've validated the user has access
-        console.log(`📦 Fetching products for company: ${companyId}`);
+        console.log(`✅ Access confirmed for company: ${companyId}`);
 
-        const productResponse = await whop.products.list({
-            company_id: companyId
-        });
-
+        // 7. FETCH PRODUCTS
+        const productResponse = await whop.products.list({ company_id: companyId });
         const allProducts = (productResponse as any).data ||
             (Array.isArray(productResponse) ? productResponse : []);
 
-        // 7. FILTER (Remove hidden/archived)
+        // 8. FILTER
         const cleanProducts = allProducts.filter((p: any) => {
             const name = p.name || p.title;
             if (!name || name.trim() === '') return false;
@@ -82,7 +85,11 @@ export default async function handler(req: any, res: any) {
         return res.status(200).json(cleanProducts);
 
     } catch (error: any) {
-        console.error("❌ API Error:", error);
-        return res.status(500).json({ error: error.message || 'Internal Server Error' });
+        console.error("❌ API Error:", error.message);
+        console.error("Stack:", error.stack);
+        return res.status(500).json({
+            error: error.message || 'Internal Server Error',
+            debug: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
 }
