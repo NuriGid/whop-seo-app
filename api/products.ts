@@ -1,79 +1,62 @@
-
 export default async function handler(req: any, res: any) {
-    // 1. CORS VE CACHE
+    // 1. CORS & CACHE CONTROL
+    // We disable caching to ensure the user always sees their current, real-time product list.
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
     res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization, x-whop-user-token');
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
 
-    if (req.method === 'OPTIONS') return res.status(200).end();
+    if (req.method === 'OPTIONS') {
+        res.status(200).end();
+        return;
+    }
 
     try {
-        // 2. TOKEN ÇIKARMA
-        const envApiKey = process.env.WHOP_API_KEY;
-        let authHeader = req.headers.authorization || req.headers['x-whop-user-token'];
+        // 2. EXTRACT USER TOKEN (Pass-Through)
+        // We use the user's token instead of a static API key to ensure strict data isolation.
+        let userToken = req.headers.authorization || req.headers['x-whop-user-token'];
+        if (Array.isArray(userToken)) userToken = userToken[0];
 
-        // Cookie Fallback
-        if (!authHeader && req.headers.cookie) {
-            const match = req.headers.cookie.match(/whop_user_token=([^;]+)/);
-            if (match) authHeader = match[1];
+        if (!userToken) {
+            console.error("❌ Error: No token provided.");
+            return res.status(401).json({ error: 'Token missing. Please open inside Whop.' });
         }
 
-        if (Array.isArray(authHeader)) authHeader = authHeader[0];
+        if (!userToken.startsWith('Bearer ')) userToken = `Bearer ${userToken}`;
 
-        // KARAR ANI: API Key mi, User Token mı?
-        let finalToken = '';
-
-        if (envApiKey) {
-            console.log("🔑 Using Server API Key (Priority)");
-            finalToken = envApiKey.startsWith('Bearer ') ? envApiKey : `Bearer ${envApiKey}`;
-        } else if (authHeader) {
-            console.log("👤 Using User Token (Client)");
-            finalToken = authHeader.startsWith('Bearer ') ? authHeader : `Bearer ${authHeader}`;
-        } else {
-            return res.status(401).json({ error: 'Token eksik. API Key veya User Token yok.' });
-        }
-
-        // 3. API İSTEĞİ (MANUEL FETCH)
+        // 3. CALL WHOP API (Using User Token)
         const response = await fetch('https://api.whop.com/api/v5/company/products', {
             method: 'GET',
             headers: {
-                'Authorization': finalToken,
+                'Authorization': userToken,
                 'Content-Type': 'application/json'
             }
         });
 
         if (!response.ok) {
             const errorText = await response.text();
-            console.error("Whop API Error:", response.status, errorText);
-
-            if (response.status === 401) {
-                return res.status(401).json({
-                    error: 'Authentication Failed (401)',
-                    details: 'Check WHOP_API_KEY or User Permissions.'
-                });
-            }
-            return res.status(response.status).json({ error: `API ERROR V-KEY`, details: errorText });
+            if (response.status === 401) return res.status(401).json({ error: 'Invalid Token.' });
+            return res.status(response.status).json({ error: `Whop API Error`, details: errorText });
         }
 
         const data = await response.json();
         const allProducts = Array.isArray(data) ? data : (data.data || []);
 
-        // 4. FİLTRELEME
-        const cleanProducts = Array.isArray(allProducts) ? allProducts.filter((p: any) => {
+        // 4. FILTER GHOST/INVALID DATA
+        // We filter out incomplete or archived items to ensure the UI only shows actionable products.
+        const cleanProducts = allProducts.filter((p: any) => {
             if (!p.id || !p.name) return false;
-            const name = p.name.trim().toLowerCase();
-            const blacklistedTerms = ['benim uygulamam', 'seo assistant'];
-            if (blacklistedTerms.some(term => name.includes(term))) return false;
-            if (p.visibility === 'hidden' || p.visibility === 'archived' || p.status === 'deleted') return false;
+            if (p.name.trim() === '') return false;
+            if (p.status === 'archived' || p.visibility === 'hidden') return false;
             return true;
-        }) : [];
+        });
 
-        return res.status(200).json({ data: cleanProducts });
+        console.log(`📦 Fetched: ${allProducts.length} -> Cleaned: ${cleanProducts.length}`);
+
+        return res.status(200).json(cleanProducts);
 
     } catch (error: any) {
-        console.error("Handler Error:", error);
         return res.status(500).json({ error: error.message });
     }
 }
