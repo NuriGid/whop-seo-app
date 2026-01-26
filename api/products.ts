@@ -48,18 +48,25 @@ export default async function handler(req: any, res: any) {
         const userId = tokenResult.userId;
         console.log(`✅ User verified: ${userId}`);
 
+
         // 5. GET COMPANY ID
         const companyId = webHeaders.get('x-whop-company-id');
+
+        console.log(`🏢 Company ID from header: ${companyId || 'NOT FOUND'}`);
+        console.log(`🔑 All headers received:`, JSON.stringify(Object.fromEntries(webHeaders.entries()), null, 2));
 
         if (!companyId) {
             console.error("❌ No x-whop-company-id header");
             return res.status(403).json({
-                error: 'Company ID not found. Ensure app is accessed from Whop Dashboard.'
+                error: 'Company ID not found. Ensure app is accessed from Whop Dashboard.',
+                debug_headers: Object.fromEntries(webHeaders.entries())
             });
         }
 
         // 6. CHECK ACCESS
+        console.log(`🔐 Checking access for user ${userId} to company ${companyId}`);
         const access = await whop.users.checkAccess(companyId, { id: userId });
+        console.log(`🔐 Access result:`, JSON.stringify(access, null, 2));
 
         if (!access.has_access) {
             console.error("❌ User does not have access to company");
