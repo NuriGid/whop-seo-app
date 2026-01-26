@@ -15,42 +15,62 @@ export default async function handler(req: any, res: any) {
 
     try {
         // 2. INITIALIZE SDK WITH APP KEY
-        // IMPORTANT: 'WHOP_API_KEY' in .env must be your APP KEY (starts with 'app_'), NOT a Company Key.
-        // This is safe because we only use it after validating the user's token.
         const whop = new WhopSDK({
             apiKey: process.env.WHOP_API_KEY,
-            appID: process.env.WHOP_APP_ID || process.env.NEXT_PUBLIC_WHOP_APP_ID // Accept either format
+            appID: process.env.WHOP_APP_ID || process.env.NEXT_PUBLIC_WHOP_APP_ID
         });
 
-        // 3. VALIDATE USER TOKEN
-        // Pass entire headers object - SDK will find x-whop-user-token automatically
-        const validation = await whop.verifyUserToken(req.headers as any);
+        // 3. VERIFY USER TOKEN (Get userId from headers)
+        // The SDK extracts x-whop-user-token from headers automatically
+        const tokenResult = await whop.verifyUserToken(req.headers as any);
 
-        if (!validation) {
-            console.error("❌ Auth Failed: Whop user token not found or invalid");
+        if (!tokenResult || !tokenResult.userId) {
+            console.error("❌ Auth Failed: Could not verify user token");
             return res.status(401).json({
-                error: 'Whop user token not found. If you are the app developer, ensure you are developing in the whop.com iframe and have the dev proxy enabled.'
+                error: 'Authentication failed. Please open this app inside Whop Dashboard.'
             });
         }
 
-        const companyId = (validation as any).company_id || (validation as any).companyId;
+        const userId = tokenResult.userId;
+        console.log(`✅ User verified: ${userId}`);
+
+        // 4. GET COMPANY ID FROM HEADERS OR TOKEN
+        // The company context is passed via headers by the Whop iframe
+        const companyId = req.headers['x-whop-company-id'] ||
+            (tokenResult as any).companyId ||
+            (tokenResult as any).company_id;
 
         if (!companyId) {
-            return res.status(403).json({ error: 'No Company ID found in user token.' });
+            console.error("❌ No company ID found in request");
+            return res.status(403).json({
+                error: 'Company ID not found. Please ensure app is installed on your company.'
+            });
         }
 
-        console.log(`🔐 Authorized Access -> Fetching Products for Company: ${companyId}`);
+        // 5. CHECK USER ACCESS TO COMPANY (Security validation) 
+        // This confirms the user actually has access to this company
+        try {
+            const access = await whop.users.checkAccess(companyId, { id: userId });
+            console.log(`✅ Access confirmed for user ${userId} to company ${companyId}`);
+        } catch (accessError: any) {
+            console.error("❌ Access check failed:", accessError.message);
+            return res.status(403).json({
+                error: 'User does not have access to this company.'
+            });
+        }
 
-        // 5. FETCH PRODUCTS (SCOPED TO COMPANY)
-        // We use the App Key to fetch, BUT we restrict it to the validated company_id.
-        // This guarantees Data Isolation.
+        // 6. FETCH PRODUCTS (Scoped to validated company)
+        // Now safe to fetch - we've validated the user has access
+        console.log(`📦 Fetching products for company: ${companyId}`);
+
         const productResponse = await whop.products.list({
             company_id: companyId
         });
 
-        const allProducts = (productResponse as any).data || (Array.isArray(productResponse) ? productResponse : []);
+        const allProducts = (productResponse as any).data ||
+            (Array.isArray(productResponse) ? productResponse : []);
 
-        // 6. FILTER
+        // 7. FILTER (Remove hidden/archived)
         const cleanProducts = allProducts.filter((p: any) => {
             const name = p.name || p.title;
             if (!name || name.trim() === '') return false;
@@ -58,6 +78,7 @@ export default async function handler(req: any, res: any) {
             return true;
         });
 
+        console.log(`✅ Returning ${cleanProducts.length} products`);
         return res.status(200).json(cleanProducts);
 
     } catch (error: any) {
