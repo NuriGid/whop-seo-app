@@ -22,29 +22,15 @@ export default async function handler(req: any, res: any) {
             appID: process.env.WHOP_APP_ID || process.env.NEXT_PUBLIC_WHOP_APP_ID // Accept either format
         });
 
-        // 3. EXTRACT USER TOKEN
-        let userToken = req.headers['x-whop-user-token'] || req.headers.authorization;
-        if (Array.isArray(userToken)) userToken = userToken[0];
-
-        if (!userToken) {
-            return res.status(401).json({ error: 'Token missing. Please open inside Whop.' });
-        }
-        if (userToken.startsWith('Bearer ')) userToken = userToken.replace('Bearer ', '');
-
-        // 4. VALIDATE TOKEN & GET CONTEXT
-        // This decodes the token securely ensuring the user belongs to the company they claim.
-        // We assume verifyUserToken accepts the token string or headers.
-        // Based on SDK: it usually takes headers or check documentation.
-        // Let's pass the header object carefully.
-        // 4. VALIDATE TOKEN & GET CONTEXT
-        // We cast to any to satisfy the SDK's strict Headers type expectation.
-        const validation = await whop.verifyUserToken({
-            'x-whop-user-token': userToken
-        } as any);
+        // 3. VALIDATE USER TOKEN
+        // Pass entire headers object - SDK will find x-whop-user-token automatically
+        const validation = await whop.verifyUserToken(req.headers as any);
 
         if (!validation) {
-            console.error("❌ Auth Failed: Invalid User Token");
-            return res.status(401).json({ error: 'Invalid User Session' });
+            console.error("❌ Auth Failed: Whop user token not found or invalid");
+            return res.status(401).json({
+                error: 'Whop user token not found. If you are the app developer, ensure you are developing in the whop.com iframe and have the dev proxy enabled.'
+            });
         }
 
         const companyId = (validation as any).company_id || (validation as any).companyId;
