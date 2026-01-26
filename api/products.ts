@@ -19,7 +19,7 @@ export default async function handler(req: any, res: any) {
         // This is safe because we only use it after validating the user's token.
         const whop = new WhopSDK({
             apiKey: process.env.WHOP_API_KEY,
-            appID: process.env.WHOP_APP_ID // Required for verifyUserToken
+            appID: process.env.WHOP_APP_ID || process.env.NEXT_PUBLIC_WHOP_APP_ID // Accept either format
         });
 
         // 3. EXTRACT USER TOKEN
