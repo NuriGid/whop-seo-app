@@ -24,18 +24,23 @@ export default async function handler(req: any, res: any) {
         if (!userToken.startsWith('Bearer ')) userToken = `Bearer ${userToken}`;
 
         // 3. CALL WHOP API (Using User Token)
+        // We send the token as 'x-whop-user-token' which is how the Proxy expects user identity.
+        // We DO NOT use 'Authorization' because that expects a static API Key.
         const response = await fetch('https://api.whop.com/api/v5/company/products', {
             method: 'GET',
             headers: {
-                'Authorization': userToken,
+                'x-whop-user-token': userToken.replace('Bearer ', ''),
                 'Content-Type': 'application/json'
             }
         });
 
         if (!response.ok) {
             const errorText = await response.text();
-            if (response.status === 401) return res.status(401).json({ error: 'Invalid Token.' });
-            return res.status(response.status).json({ error: `Whop API Error: ${errorText}`, details: errorText });
+            // If 401/403, it means the token isn't allowed to see this company's data. Good.
+            if (response.status === 401 || response.status === 403) {
+                return res.status(401).json({ error: 'Unauthorized: User does not have access to this company.' });
+            }
+            return res.status(response.status).json({ error: `Whop API Error: ${response.status}`, details: errorText });
         }
 
         const data = await response.json();
