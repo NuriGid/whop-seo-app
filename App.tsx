@@ -259,7 +259,7 @@ const App: React.FC = () => {
             Content Marketing Assistant
           </h1>
           <p className="text-gray-400 text-sm">
-            Generate AI-powered marketing content for your Whop courses.
+            Select a course and get AI-powered marketing content for Twitter, Email, Instagram, and TikTok.
           </p>
         </div>
 
