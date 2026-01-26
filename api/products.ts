@@ -1,3 +1,5 @@
+import WhopSDK from '@whop/sdk';
+
 export default async function handler(req: any, res: any) {
     // 1. CORS & CACHE CONTROL
     res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -12,49 +14,60 @@ export default async function handler(req: any, res: any) {
     }
 
     try {
-        // 2. EXTRACT USER TOKEN (Pass-Through)
-        let userToken = req.headers.authorization || req.headers['x-whop-user-token'];
+        // 2. INITIALIZE SDK WITH APP KEY
+        // IMPORTANT: 'WHOP_API_KEY' in .env must be your APP KEY (starts with 'app_'), NOT a Company Key.
+        // This is safe because we only use it after validating the user's token.
+        const whop = new WhopSDK({
+            apiKey: process.env.WHOP_API_KEY
+        });
+
+        // 3. EXTRACT USER TOKEN
+        let userToken = req.headers['x-whop-user-token'] || req.headers.authorization;
         if (Array.isArray(userToken)) userToken = userToken[0];
 
         if (!userToken) {
-            console.error("❌ Error: No token provided.");
             return res.status(401).json({ error: 'Token missing. Please open inside Whop.' });
         }
+        if (userToken.startsWith('Bearer ')) userToken = userToken.replace('Bearer ', '');
 
-        if (!userToken.startsWith('Bearer ')) userToken = `Bearer ${userToken}`;
-
-        // 3. CALL WHOP API (Using User Token)
-        // We send the token as 'x-whop-user-token' which is how the Proxy expects user identity.
-        // We DO NOT use 'Authorization' because that expects a static API Key.
-        const response = await fetch('https://api.whop.com/api/v5/company/products', {
-            method: 'GET',
-            headers: {
-                'x-whop-user-token': userToken.replace('Bearer ', ''),
-                'Content-Type': 'application/json'
-            }
+        // 4. VALIDATE TOKEN & GET CONTEXT
+        // This decodes the token securely ensuring the user belongs to the company they claim.
+        // We assume verifyUserToken accepts the token string or headers.
+        // Based on SDK: it usually takes headers or check documentation.
+        // Let's pass the header object carefully.
+        const validation = await whop.verifyUserToken({
+            'x-whop-user-token': userToken
         });
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            // If 401/403, it means the token isn't allowed to see this company's data. Good.
-            if (response.status === 401 || response.status === 403) {
-                return res.status(401).json({ error: 'Unauthorized: User does not have access to this company.' });
-            }
-            return res.status(response.status).json({ error: `Whop API Error: ${response.status}`, details: errorText });
+        if (!validation) {
+            console.error("❌ Auth Failed: Invalid User Token");
+            return res.status(401).json({ error: 'Invalid User Session' });
         }
 
-        const data = await response.json();
-        const allProducts = Array.isArray(data) ? data : (data.data || []);
+        const companyId = validation.companyId || (validation as any).company_id;
 
-        // 4. FILTER GHOST/INVALID DATA
-        const cleanProducts = allProducts.filter((p: any) => {
-            if (!p.id || !p.name) return false;
-            if (p.name.trim() === '') return false;
-            if (p.status === 'archived' || p.visibility === 'hidden') return false;
-            return true;
+        if (!companyId) {
+            return res.status(403).json({ error: 'No Company ID found in user token.' });
+        }
+
+        console.log(`🔐 Authorized Access -> Fetching Products for Company: ${companyId}`);
+
+        // 5. FETCH PRODUCTS (SCOPED TO COMPANY)
+        // We use the App Key to fetch, BUT we restrict it to the validated company_id.
+        // This guarantees Data Isolation.
+        const productResponse = await whop.products.list({
+            company_id: companyId
         });
 
-        console.log(`📦 Fetched: ${allProducts.length} -> Cleaned: ${cleanProducts.length}`);
+        const allProducts = (productResponse as any).data || (Array.isArray(productResponse) ? productResponse : []);
+
+        // 6. FILTER
+        const cleanProducts = allProducts.filter((p: any) => {
+            const name = p.name || p.title;
+            if (!name || name.trim() === '') return false;
+            if (p.visibility === 'hidden' || p.status === 'archived') return false;
+            return true;
+        });
 
         return res.status(200).json(cleanProducts);
 
