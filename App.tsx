@@ -1,13 +1,30 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { WhopProduct, AnalysisResult } from './types';
+import { WhopProduct, WhopPlan, WhopPayment, AnalysisResult } from './types';
 import ResultCard from './components/ResultCard';
 import Loader from './components/Loader';
+import PlansTable from './components/PlansTable';
+import PaymentsTable from './components/PaymentsTable';
 
 interface AppState {
   isLoading: boolean;
   isInWhop: boolean;
+  userToken: string | null;
+  companyId: string | null;
+
+  // Data
   products: WhopProduct[];
+  plans: WhopPlan[];
+  payments: WhopPayment[];
+
+  // Tab State
+  activeTab: 'content' | 'plans' | 'payments';
+
+  // Loading States
+  isLoadingProducts: boolean;
+  isLoadingPlans: boolean;
+  isLoadingPayments: boolean;
+
+  // Selected Product & Analysis
   productsError: string | null;
   selectedProduct: WhopProduct | null;
   courseDescription: string;
@@ -15,21 +32,17 @@ interface AppState {
   isAnalyzing: boolean;
   analysisError: string | null;
   isDropdownOpen: boolean;
-  userToken: string | null;
-  companyId: string | null;
 }
 
-
-
-// Document Icon Component
+// Icons
 const DocumentIcon: React.FC<{ className?: string }> = ({ className }) => (
+  // ... (SVG content same as before)
   <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
   </svg>
 );
-
-// Book Icon Component
 const BookIcon: React.FC<{ className?: string }> = ({ className }) => (
+  // ... (SVG content same as before)
   <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
   </svg>
@@ -39,7 +52,19 @@ const App: React.FC = () => {
   const [state, setState] = useState<AppState>({
     isLoading: true,
     isInWhop: false,
+    userToken: null,
+    companyId: null,
+
     products: [],
+    plans: [],
+    payments: [],
+
+    activeTab: 'content',
+
+    isLoadingProducts: false,
+    isLoadingPlans: false,
+    isLoadingPayments: false,
+
     productsError: null,
     selectedProduct: null,
     courseDescription: '',
@@ -47,20 +72,14 @@ const App: React.FC = () => {
     isAnalyzing: false,
     analysisError: null,
     isDropdownOpen: false,
-    userToken: null,
-    companyId: null,
   });
 
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const fetchedTabs = useRef<Set<string>>(new Set());
 
   // Build default description template
   const buildDescriptionTemplate = (productName: string) => {
-    return `Course: ${productName}
-
-Please add a detailed description of this course, including:
-- What students will learn
-- Course features
-- Target audience`;
+    return `Course: ${productName}\n\nPlease add a detailed description of this course, including:\n- What students will learn\n- Course features\n- Target audience`;
   };
 
   // Close dropdown when clicking outside
@@ -74,139 +93,109 @@ Please add a detailed description of this course, including:
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Check if we're in Whop iframe and fetch products
+  // Fetch Logic Helper
+  const fetchData = async (endpoint: string, token: string, companyId: string | null) => {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    };
+    if (companyId) headers['X-Whop-Company-Id'] = companyId;
+
+    const response = await fetch(endpoint, { method: 'GET', headers });
+    if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
+    const json = await response.json();
+    return json.data || [];
+  };
+
+  // Initialize and Fetch Products (Default)
   useEffect(() => {
     const init = async () => {
       const isInIframe = window !== window.parent;
-
       if (!isInIframe) {
-        setState(prev => ({
-          ...prev,
-          isLoading: false,
-          isInWhop: false,
-          productsError: 'This app must be opened from within Whop.',
-        }));
+        setState(prev => ({ ...prev, isLoading: false, isInWhop: false, productsError: 'This app must be opened from within Whop.' }));
         return;
       }
 
-      // Extract User Token from URL or other sources
       const urlParams = new URLSearchParams(window.location.search);
       const token = urlParams.get('x-whop-user-token') || urlParams.get('token');
-      // Extract Company ID (often passed as 'company_id' or 'companyId' in query)
       const companyId = urlParams.get('company_id') || urlParams.get('companyId');
 
       if (!token) {
-        console.error("❌ No user token found in URL parameters.");
-        setState(prev => ({
-          ...prev,
-          isLoading: false,
-          productsError: "Could not identify user. Please refresh inside Whop."
-        }));
+        setState(prev => ({ ...prev, isLoading: false, productsError: "Could not identify user. Please refresh inside Whop." }));
         return;
       }
 
-      setState(prev => ({ ...prev, isInWhop: true, userToken: token, companyId: companyId || null }));
+      setState(prev => ({ ...prev, isInWhop: true, userToken: token, companyId: companyId || null, isLoadingProducts: true }));
 
+      // Fetch Products Immediately
       try {
-        console.log('📦 Fetching products...');
-
-        const headers: Record<string, string> = {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        };
-
-        if (companyId) {
-          headers['X-Whop-Company-Id'] = companyId;
-        }
-
-        const response = await fetch('/api/products', {
-          method: 'GET',
-          // credentials: 'include', // Not reliable for pass-through auth if not using cookie parser
-          headers: headers,
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.message || errorData.error || `Error ${response.status}`);
-        }
-
-        const data = await response.json();
-        const products: WhopProduct[] = data.data || [];
-
-        setState(prev => ({
-          ...prev,
-          isLoading: false,
-          products,
-          selectedProduct: null, // Start with no selection
-          courseDescription: '',
-          productsError: null,
-        }));
-
+        const products = await fetchData('/api/products', token, companyId);
+        setState(prev => ({ ...prev, isLoading: false, isLoadingProducts: false, products }));
+        fetchedTabs.current.add('content');
       } catch (error) {
-        console.error('❌ Failed to fetch products:', error);
-        setState(prev => ({
-          ...prev,
-          isLoading: false,
-          products: [],
-          productsError: error instanceof Error ? error.message : 'Failed to load products',
-        }));
+        console.error('Initial product fetch failed', error);
+        setState(prev => ({ ...prev, isLoading: false, isLoadingProducts: false, productsError: 'Failed to load products.' }));
       }
     };
-
     init();
   }, []);
 
-  // Handle product selection
+  // Fetch data on tab change
+  useEffect(() => {
+    if (!state.userToken || !state.activeTab) return;
+    if (fetchedTabs.current.has(state.activeTab)) return;
+
+    const loadTabData = async () => {
+      if (state.activeTab === 'plans') {
+        setState(prev => ({ ...prev, isLoadingPlans: true }));
+        try {
+          const plans = await fetchData('/api/plans', state.userToken!, state.companyId);
+          setState(prev => ({ ...prev, plans, isLoadingPlans: false }));
+          fetchedTabs.current.add('plans');
+        } catch (e) {
+          console.error('Failed to fetch plans', e);
+          setState(prev => ({ ...prev, isLoadingPlans: false }));
+        }
+      } else if (state.activeTab === 'payments') {
+        setState(prev => ({ ...prev, isLoadingPayments: true }));
+        try {
+          const payments = await fetchData('/api/payments', state.userToken!, state.companyId);
+          setState(prev => ({ ...prev, payments, isLoadingPayments: false }));
+          fetchedTabs.current.add('payments');
+        } catch (e) {
+          console.error('Failed to fetch payments', e);
+          setState(prev => ({ ...prev, isLoadingPayments: false }));
+        }
+      }
+    };
+
+    loadTabData();
+  }, [state.activeTab, state.userToken, state.companyId]);
+
+
+  // Handlers
   const handleSelectProduct = useCallback((product: WhopProduct | null) => {
-    const description = product
-      ? buildDescriptionTemplate(product.name || product.title || 'Unknown')
-      : '';
-    setState(prev => ({
-      ...prev,
-      selectedProduct: product,
-      courseDescription: description,
-      analysisResult: null,
-      analysisError: null,
-      isDropdownOpen: false,
-    }));
+    const description = product ? buildDescriptionTemplate(product.name || product.title || 'Unknown') : '';
+    setState(prev => ({ ...prev, selectedProduct: product, courseDescription: description, analysisResult: null, analysisError: null, isDropdownOpen: false }));
   }, []);
 
-  // Toggle dropdown
   const toggleDropdown = useCallback(() => {
     setState(prev => ({ ...prev, isDropdownOpen: !prev.isDropdownOpen }));
   }, []);
 
-  // Handle description change
   const handleDescriptionChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setState(prev => ({ ...prev, courseDescription: e.target.value }));
   }, []);
 
-  // Handle analysis
   const handleAnalyze = useCallback(async () => {
     if (!state.selectedProduct || !state.courseDescription.trim()) return;
-
     setState(prev => ({ ...prev, isAnalyzing: true, analysisError: null }));
-
     try {
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${state.userToken}`
-      };
-      if (state.companyId) {
-        headers['X-Whop-Company-Id'] = state.companyId;
-      }
+      const headers: Record<string, string> = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.userToken}` };
+      if (state.companyId) headers['X-Whop-Company-Id'] = state.companyId;
 
-      const response = await fetch('/api/analyze', {
-        method: 'POST',
-        // credentials: 'include',
-        headers: headers,
-        body: JSON.stringify({ prompt: state.courseDescription })
-      });
-
-      if (!response.ok) {
-        throw new Error(`Analysis Failed (${response.status})`);
-      }
-
+      const response = await fetch('/api/analyze', { method: 'POST', headers, body: JSON.stringify({ prompt: state.courseDescription }) });
+      if (!response.ok) throw new Error(`Analysis Failed (${response.status})`);
       const result = await response.json();
 
       const finalResult: AnalysisResult = {
@@ -215,24 +204,14 @@ Please add a detailed description of this course, including:
         instagramPost: result.instagramPost || result.instagram || "No content generated.",
         tiktokScript: result.tiktokScript || result.tiktok || "No content generated."
       };
-
-      setState(prev => ({
-        ...prev,
-        isAnalyzing: false,
-        analysisResult: finalResult,
-      }));
-
+      setState(prev => ({ ...prev, isAnalyzing: false, analysisResult: finalResult }));
     } catch (error) {
       console.error('❌ Analysis Error:', error);
-      setState(prev => ({
-        ...prev,
-        isAnalyzing: false,
-        analysisError: error instanceof Error ? error.message : 'Analysis failed',
-      }));
+      setState(prev => ({ ...prev, isAnalyzing: false, analysisError: error instanceof Error ? error.message : 'Analysis failed' }));
     }
-  }, [state.selectedProduct, state.courseDescription]);
+  }, [state.selectedProduct, state.courseDescription, state.userToken, state.companyId]);
 
-  // Loading state
+
   if (state.isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-900 via-gray-900 to-black">
@@ -251,79 +230,69 @@ Please add a detailed description of this course, including:
         <div className="absolute bottom-40 right-20 w-1 h-1 bg-white rounded-full"></div>
       </div>
 
-      <div className="max-w-2xl mx-auto relative z-10">
+      <div className="max-w-4xl mx-auto relative z-10">
         {/* Header */}
-        <div className="text-center mb-10">
+        <div className="text-center mb-8">
           <h1 className="text-4xl font-bold italic bg-gradient-to-r from-purple-400 to-purple-600 bg-clip-text text-transparent mb-3">
-            Content Marketing Assistant
+            Whop Business Manager
           </h1>
           <p className="text-gray-400 text-sm">
-            Select a course and get AI-powered marketing content for Twitter, Email, Instagram, and TikTok.
+            Analyze courses, view plans, and track payments.
           </p>
+        </div>
+
+        {/* Navigation Tabs */}
+        <div className="flex justify-center mb-8">
+          <div className="bg-gray-800/60 p-1 rounded-xl flex gap-1 border border-gray-700">
+            {(['content', 'plans', 'payments'] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setState(prev => ({ ...prev, activeTab: tab }))}
+                className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${state.activeTab === tab
+                    ? 'bg-purple-600 text-white shadow-lg'
+                    : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+                  }`}
+              >
+                {tab === 'content' ? 'Content Generator' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Error Display */}
         {state.productsError && (
-          <div className="bg-red-900/50 border border-red-700 rounded-xl p-4 mb-6">
+          <div className="bg-red-900/50 border border-red-700 rounded-xl p-4 mb-6 text-center">
             <p className="text-red-300">{state.productsError}</p>
           </div>
         )}
 
-        {/* Main Content */}
-        {state.products.length > 0 && (
-          <>
-            {/* Select Course Card */}
-            <div className="relative z-50 bg-gray-800/40 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-6 mb-6">
-              <label className="block text-center text-gray-300 font-medium mb-4">
-                Select a Course
-              </label>
-
-              {/* Custom Dropdown */}
+        {/* --- CONTENT GENERATOR TAB --- */}
+        {state.activeTab === 'content' && (
+          <div className="animate-fade-in space-y-6 max-w-2xl mx-auto">
+            {/* Product Selector */}
+            <div className="relative z-50 bg-gray-800/40 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-6">
+              <label className="block text-center text-gray-300 font-medium mb-4">Select a Course</label>
               <div className="relative" ref={dropdownRef}>
-                {/* Dropdown Trigger */}
                 <button
                   onClick={toggleDropdown}
-                  className="w-full bg-gray-900/80 border border-gray-600 text-white rounded-xl py-4 px-4 flex items-center justify-between focus:ring-2 focus:ring-purple-500 focus:border-transparent cursor-pointer hover:border-gray-500 transition-colors"
+                  className="w-full bg-gray-900/80 border border-gray-600 text-white rounded-xl py-4 px-4 flex items-center justify-between focus:ring-2 focus:ring-purple-500 transition-colors"
                 >
                   <div className="flex items-center gap-3">
                     <BookIcon className="h-5 w-5 text-purple-400" />
                     <span className={state.selectedProduct ? 'text-white' : 'text-gray-400'}>
-                      {state.selectedProduct
-                        ? (state.selectedProduct.name || state.selectedProduct.title)
-                        : '-- Select a course --'}
+                      {state.selectedProduct ? (state.selectedProduct.name || state.selectedProduct.title) : '-- Select a course --'}
                     </span>
                   </div>
-                  <svg
-                    className={`h-5 w-5 text-gray-400 transition-transform ${state.isDropdownOpen ? 'rotate-180' : ''}`}
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
+                  <svg className={`h-5 w-5 text-gray-400 transition-transform ${state.isDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
 
-                {/* Dropdown Menu */}
                 {state.isDropdownOpen && (
-                  <div className="absolute top-full left-0 right-0 mt-2 bg-gray-900 border border-gray-600 rounded-xl overflow-hidden z-[100] shadow-2xl">
-                    {/* Placeholder Option */}
-                    <div
-                      className="px-4 py-3 text-gray-400 cursor-pointer hover:bg-gray-700/50 transition-colors"
-                      onClick={() => handleSelectProduct(null)}
-                    >
-                      -- Select a course --
-                    </div>
-
-                    {/* Product Options */}
+                  <div className="absolute top-full left-0 right-0 mt-2 bg-gray-900 border border-gray-600 rounded-xl overflow-hidden z-[100] shadow-2xl max-h-60 overflow-y-auto">
+                    <div className="px-4 py-3 text-gray-400 cursor-pointer hover:bg-gray-700/50" onClick={() => handleSelectProduct(null)}>-- Select a course --</div>
                     {state.products.map(product => (
-                      <div
-                        key={product.id}
-                        onClick={() => handleSelectProduct(product)}
-                        className={`px-4 py-3 flex items-center gap-3 cursor-pointer transition-colors ${state.selectedProduct?.id === product.id
-                          ? 'bg-indigo-600 text-white'
-                          : 'text-gray-300 hover:bg-gray-700/50'
-                          }`}
-                      >
+                      <div key={product.id} onClick={() => handleSelectProduct(product)} className={`px-4 py-3 flex items-center gap-3 cursor-pointer ${state.selectedProduct?.id === product.id ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-700/50'}`}>
                         <DocumentIcon className="h-5 w-5 flex-shrink-0" />
                         <span>{product.name || product.title}</span>
                       </div>
@@ -333,52 +302,57 @@ Please add a detailed description of this course, including:
               </div>
             </div>
 
-            {/* Course Description Card - Only show when product selected */}
             {state.selectedProduct && (
-              <div className="relative z-0 bg-gray-800/40 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-6 mb-6">
-                <label className="block text-center text-gray-300 font-medium mb-4">
-                  Course Description (Auto-filled from selected course)
-                </label>
+              <div className="relative z-0 bg-gray-800/40 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-6">
+                <label className="block text-center text-gray-300 font-medium mb-4">Course Description</label>
                 <textarea
-                  className="w-full bg-gray-900 border border-gray-600 text-gray-200 rounded-xl p-4 min-h-[200px] resize-y focus:ring-2 focus:ring-purple-500 focus:border-transparent leading-relaxed"
+                  className="w-full bg-gray-900 border border-gray-600 text-gray-200 rounded-xl p-4 min-h-[200px] resize-y focus:ring-2 focus:ring-purple-500 leading-relaxed"
                   value={state.courseDescription}
                   onChange={handleDescriptionChange}
                   placeholder="Enter course description..."
                 />
-
-                {/* Generate Button - Inside Card */}
                 <button
                   onClick={handleAnalyze}
                   disabled={state.isAnalyzing || !state.courseDescription.trim()}
-                  className="w-full mt-6 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-4 px-6 rounded-xl transition-all shadow-lg"
+                  className="w-full mt-6 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 disabled:opacity-50 text-white font-semibold py-4 px-6 rounded-xl transition-all shadow-lg"
                 >
                   {state.isAnalyzing ? 'Generating...' : 'Generate Marketing Content'}
                 </button>
               </div>
             )}
-          </>
-        )}
 
-        {/* Analysis Loading */}
-        {state.isAnalyzing && (
-          <div className="flex justify-center my-8">
-            <Loader />
+            {state.isAnalyzing && <div className="flex justify-center my-8"><Loader /></div>}
+            {state.analysisError && <div className="bg-red-900/50 border border-red-700 rounded-xl p-4 my-6 text-red-300">Error: {state.analysisError}</div>}
+            {state.analysisResult && <div className="mt-8"><ResultCard result={state.analysisResult} /></div>}
           </div>
         )}
 
-        {/* Analysis Error */}
-        {state.analysisError && (
-          <div className="bg-red-900/50 border border-red-700 rounded-xl p-4 my-6">
-            <p className="text-red-300 font-medium">Error: {state.analysisError}</p>
+        {/* --- PLANS TAB --- */}
+        {state.activeTab === 'plans' && (
+          <div className="animate-fade-in">
+            {state.isLoadingPlans ? (
+              <div className="flex justify-center py-20"><Loader /></div>
+            ) : (
+              <PlansTable plans={state.plans} />
+            )}
           </div>
         )}
 
-        {/* Analysis Results */}
-        {state.analysisResult && (
-          <div className="mt-8">
-            <ResultCard result={state.analysisResult} />
+        {/* --- PAYMENTS TAB --- */}
+        {state.activeTab === 'payments' && (
+          <div className="animate-fade-in">
+            {state.isLoadingPayments ? (
+              <div className="flex justify-center py-20"><Loader /></div>
+            ) : (
+              <PaymentsTable
+                payments={state.payments}
+                userToken={state.userToken}
+                companyId={state.companyId}
+              />
+            )}
           </div>
         )}
+
       </div>
     </div>
   );

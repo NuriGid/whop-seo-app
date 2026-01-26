@@ -23,60 +23,23 @@ console.log('   GROQ_API_KEY:', GROQ_API_KEY ? '✓ Set' : '✗ Missing');
 const WHOP_API_KEY = (process.env.WHOP_API_KEY || '').trim();
 console.log('   WHOP_API_KEY:', WHOP_API_KEY ? '✓ Set' : '✗ Missing');
 
-// API Route: Get Products (STRICT PASS-THROUGH AUTH)
-app.get('/api/products', async (req, res) => {
-  try {
-    // 🔐 STRICT AUTH: Extract Authorization header
-    const authHeader = req.headers.authorization;
+// Routes - Import Handlers
+import productsHandler from './api/products';
+import plansHandler from './api/plans';
+import paymentsHandler from './api/payments';
+import paymentFeesHandler from './api/payment_fees';
 
-    if (!authHeader || typeof authHeader !== 'string') {
-      console.error('❌ AUTH_REQUIRED: No Authorization header');
-      return res.status(401).json({
-        error: 'AUTH_REQUIRED',
-        message: 'Authorization header is required. Please open this app inside Whop.',
-      });
-    }
+// API Route: Get Products
+app.get('/api/products', (req, res) => productsHandler(req, res));
 
-    if (!authHeader.startsWith('Bearer ')) {
-      console.error('❌ INVALID_TOKEN: Authorization header must be Bearer token');
-      return res.status(401).json({
-        error: 'INVALID_TOKEN',
-        message: 'Authorization header must be a Bearer token.',
-      });
-    }
+// API Route: Get Plans
+app.get('/api/plans', (req, res) => plansHandler(req, res));
 
-    console.log('🔐 Pass-through auth: forwarding user token to Whop API...');
+// API Route: Get Payments
+app.get('/api/payments', (req, res) => paymentsHandler(req, res));
 
-    // PASS-THROUGH: Forward EXACT token to Whop API
-    const whopResponse = await fetch('https://api.whop.com/api/v5/company/products', {
-      method: 'GET',
-      headers: {
-        'Authorization': authHeader, // Forward exact token
-        'Content-Type': 'application/json',
-      },
-    });
-
-    const responseData = await whopResponse.json();
-
-    if (!whopResponse.ok) {
-      console.error('❌ Whop API error:', whopResponse.status, responseData);
-      return res.status(whopResponse.status).json({
-        error: responseData.error || 'Whop API request failed',
-        message: responseData.message || `Status: ${whopResponse.status}`,
-      });
-    }
-
-    console.log(`✅ Products fetched: ${responseData.data?.length || 0} items`);
-    return res.status(200).json(responseData);
-
-  } catch (error: any) {
-    console.error('❌ Products API error:', error);
-    return res.status(500).json({
-      error: 'Internal server error',
-      message: error?.message || 'Unknown error',
-    });
-  }
-});
+// API Route: Get Payment Fees
+app.get('/api/payments/:id/fees', (req, res) => paymentFeesHandler(req, res));
 
 // API Route: Analyze Content
 app.post('/api/analyze', async (req, res) => {

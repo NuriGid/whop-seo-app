@@ -20,8 +20,6 @@ export default async function handler(req: any, res: any) {
         });
 
         // 3. VERIFY USER TOKEN (SECURE)
-        // This validates the token and extracts context (User ID, Company ID)
-        // verifyUserToken expects a headers object.
         const validation = await whop.verifyUserToken(req.headers);
 
         if (!validation) {
@@ -30,7 +28,6 @@ export default async function handler(req: any, res: any) {
         }
 
         // Map the secure validation result to targetCompanyId
-        // Type assertion used because SDK types might be strict
         const targetCompanyId = (validation as any).companyId || (validation as any).company_id;
 
         if (!targetCompanyId) {
@@ -38,39 +35,23 @@ export default async function handler(req: any, res: any) {
             return res.status(400).json({ error: 'Company scope missing. Please ensure the app is opened within a company context.' });
         }
 
-        console.log(`🔐 Fetching products for Company: ${targetCompanyId} (App Mode)`);
+        console.log(`🔐 Fetching payments for Company: ${targetCompanyId} (App Mode)`);
 
         // 4. CALL WHOP API VIA SDK
-        // Based on docs: whop.products.list({ company_id: '...' })
-        const productResponse = await whop.products.list({
+        // Docs: whop.payments.list({ company_id: '...' })
+        const response = await whop.payments.list({
             company_id: targetCompanyId
         });
 
-        // The SDK likely returns a response object with a .data property or the data directly.
-        // We need to handle potential pagination wrapper. 
-        // Usually SDK returns { data: [...], page_info: ... } or just [...] depending on version.
-        // We'll safely unwrap it.
+        const rawData = (response as any).data ? (response as any).data : response;
+        const allPayments = Array.isArray(rawData) ? rawData : [];
 
-        // Type guard / Check
-        const rawData = (productResponse as any).data ? (productResponse as any).data : productResponse;
-        const allProducts = Array.isArray(rawData) ? rawData : [];
+        console.log(`📦 Fetched: ${allPayments.length} Payments`);
 
-        // 5. FILTER GHOST/INVALID DATA
-        const cleanProducts = allProducts.filter((p: any) => {
-            if (!p.id || !p.title && !p.name) return false; // Support both title (v5) and name (legacy)
-            const name = p.title || p.name;
-            if (!name || name.trim() === '') return false;
-            if (p.visibility === 'archived' || p.visibility === 'hidden') return false;
-            return true;
-        });
-
-        console.log(`📦 Fetched: ${allProducts.length} -> Cleaned: ${cleanProducts.length}`);
-
-        return res.status(200).json({ data: cleanProducts });
+        return res.status(200).json({ data: allPayments });
 
     } catch (error: any) {
         console.error("❌ API Error:", error);
-        // SDK errors often have a .message or .response
         return res.status(500).json({ error: error.message || 'Internal Server Error' });
     }
 }
