@@ -15,7 +15,9 @@ interface AppState {
   isAnalyzing: boolean;
   analysisError: string | null;
   isDropdownOpen: boolean;
+  userToken: string | null;
 }
+
 
 // Document Icon Component
 const DocumentIcon: React.FC<{ className?: string }> = ({ className }) => (
@@ -43,6 +45,7 @@ const App: React.FC = () => {
     isAnalyzing: false,
     analysisError: null,
     isDropdownOpen: false,
+    userToken: null,
   });
 
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -83,15 +86,32 @@ Please add a detailed description of this course, including:
         return;
       }
 
-      setState(prev => ({ ...prev, isInWhop: true }));
+      // Extract User Token from URL or other sources
+      const urlParams = new URLSearchParams(window.location.search);
+      const token = urlParams.get('x-whop-user-token') || urlParams.get('token');
+
+      if (!token) {
+        console.error("❌ No user token found in URL parameters.");
+        setState(prev => ({
+          ...prev,
+          isLoading: false,
+          productsError: "Could not identify user. Please refresh inside Whop."
+        }));
+        return;
+      }
+
+      setState(prev => ({ ...prev, isInWhop: true, userToken: token }));
 
       try {
         console.log('📦 Fetching products...');
 
         const response = await fetch('/api/products', {
           method: 'GET',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
+          // credentials: 'include', // Not reliable for pass-through auth if not using cookie parser
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
         });
 
         if (!response.ok) {
@@ -159,8 +179,11 @@ Please add a detailed description of this course, including:
     try {
       const response = await fetch('/api/analyze', {
         method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        // credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${state.userToken}`
+        },
         body: JSON.stringify({ prompt: state.courseDescription })
       });
 
