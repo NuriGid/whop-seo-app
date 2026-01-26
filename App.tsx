@@ -16,7 +16,9 @@ interface AppState {
   analysisError: string | null;
   isDropdownOpen: boolean;
   userToken: string | null;
+  companyId: string | null;
 }
+
 
 
 // Document Icon Component
@@ -46,6 +48,7 @@ const App: React.FC = () => {
     analysisError: null,
     isDropdownOpen: false,
     userToken: null,
+    companyId: null,
   });
 
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -89,6 +92,8 @@ Please add a detailed description of this course, including:
       // Extract User Token from URL or other sources
       const urlParams = new URLSearchParams(window.location.search);
       const token = urlParams.get('x-whop-user-token') || urlParams.get('token');
+      // Extract Company ID (often passed as 'company_id' or 'companyId' in query)
+      const companyId = urlParams.get('company_id') || urlParams.get('companyId');
 
       if (!token) {
         console.error("❌ No user token found in URL parameters.");
@@ -100,18 +105,24 @@ Please add a detailed description of this course, including:
         return;
       }
 
-      setState(prev => ({ ...prev, isInWhop: true, userToken: token }));
+      setState(prev => ({ ...prev, isInWhop: true, userToken: token, companyId: companyId || null }));
 
       try {
         console.log('📦 Fetching products...');
 
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        };
+
+        if (companyId) {
+          headers['X-Whop-Company-Id'] = companyId;
+        }
+
         const response = await fetch('/api/products', {
           method: 'GET',
           // credentials: 'include', // Not reliable for pass-through auth if not using cookie parser
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
+          headers: headers,
         });
 
         if (!response.ok) {
@@ -177,13 +188,18 @@ Please add a detailed description of this course, including:
     setState(prev => ({ ...prev, isAnalyzing: true, analysisError: null }));
 
     try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${state.userToken}`
+      };
+      if (state.companyId) {
+        headers['X-Whop-Company-Id'] = state.companyId;
+      }
+
       const response = await fetch('/api/analyze', {
         method: 'POST',
         // credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${state.userToken}`
-        },
+        headers: headers,
         body: JSON.stringify({ prompt: state.courseDescription })
       });
 

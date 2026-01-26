@@ -20,6 +20,8 @@ const GROQ_API_KEY = (process.env.GROQ_API_KEY || '').trim();
 
 console.log('✅ Environment check:');
 console.log('   GROQ_API_KEY:', GROQ_API_KEY ? '✓ Set' : '✗ Missing');
+const WHOP_API_KEY = (process.env.WHOP_API_KEY || '').trim();
+console.log('   WHOP_API_KEY:', WHOP_API_KEY ? '✓ Set' : '✗ Missing');
 
 // API Route: Get Products (STRICT PASS-THROUGH AUTH)
 app.get('/api/products', async (req, res) => {
