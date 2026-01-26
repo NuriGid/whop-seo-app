@@ -108,7 +108,7 @@ const App: React.FC = () => {
     const response = await fetch(endpoint, { method: 'GET', headers });
     if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
     const json = await response.json();
-    return json.data || [];
+    return json.data || json; // Handle both {data: [...]} and raw [...] formats
   };
 
   // Initialize and Fetch Products (Default)
