@@ -35,16 +35,18 @@ export default async function handler(req: any, res: any) {
         // We assume verifyUserToken accepts the token string or headers.
         // Based on SDK: it usually takes headers or check documentation.
         // Let's pass the header object carefully.
+        // 4. VALIDATE TOKEN & GET CONTEXT
+        // We cast to any to satisfy the SDK's strict Headers type expectation.
         const validation = await whop.verifyUserToken({
             'x-whop-user-token': userToken
-        });
+        } as any);
 
         if (!validation) {
             console.error("❌ Auth Failed: Invalid User Token");
             return res.status(401).json({ error: 'Invalid User Session' });
         }
 
-        const companyId = validation.companyId || (validation as any).company_id;
+        const companyId = (validation as any).company_id || (validation as any).companyId;
 
         if (!companyId) {
             return res.status(403).json({ error: 'No Company ID found in user token.' });
