@@ -1,9 +1,13 @@
 /**
- * Whop Product Update API
+ * Whop Course Update API
  * 
- * This endpoint allows the app to directly update a product's description on Whop.
+ * This endpoint allows the app to directly update a course's description on Whop.
  * This provides the "Native Utility" required for Whop App Store approval.
+ * 
+ * Uses Whop SDK with courses:update permission.
  */
+
+import WhopSDK from '@whop/sdk';
 
 export default async function handler(req: any, res: any) {
     // 1. CORS HEADERS
@@ -39,7 +43,7 @@ export default async function handler(req: any, res: any) {
         const { productId, newDescription } = req.body;
 
         if (!productId) {
-            return res.status(400).json({ error: 'Missing required field: productId' });
+            return res.status(400).json({ error: 'Missing required field: productId (course ID)' });
         }
 
         if (!newDescription || typeof newDescription !== 'string') {
@@ -52,79 +56,55 @@ export default async function handler(req: any, res: any) {
             console.error('❌ WHOP_API_KEY is not set in environment variables');
             return res.status(500).json({
                 error: 'Server configuration error: API key not configured.',
-                hint: 'Ensure WHOP_API_KEY is set in Vercel Environment Variables with Write/Update permissions.'
+                hint: 'Ensure WHOP_API_KEY is set in Vercel Environment Variables.'
             });
         }
 
-        // 4. UPDATE COURSE VIA WHOP API V5
-        console.log(`📝 Updating course ${productId} description...`);
-
-        // Try courses endpoint first (matches courses:update permission)
-        const whopResponse = await fetch(`https://api.whop.com/api/v5/company/courses/${productId}`, {
-            method: 'PUT',
-            headers: {
-                'Authorization': `Bearer ${apiKey}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                description: newDescription
-            })
+        // 4. INITIALIZE WHOP SDK
+        const whop = new WhopSDK({
+            apiKey: apiKey,
+            appID: process.env.WHOP_APP_ID || process.env.NEXT_PUBLIC_WHOP_APP_ID
         });
 
-        // 5. HANDLE WHOP API RESPONSE
-        const responseText = await whopResponse.text();
-        let responseData;
+        // 5. UPDATE COURSE USING SDK (matches courses:update permission)
+        console.log(`📝 Updating course ${productId} description...`);
 
-        try {
-            responseData = JSON.parse(responseText);
-        } catch {
-            responseData = { raw: responseText };
-        }
-
-        if (!whopResponse.ok) {
-            console.error(`❌ Whop API Error (${whopResponse.status}):`, responseData);
-
-            // Provide clear error messages for common issues
-            if (whopResponse.status === 401) {
-                return res.status(401).json({
-                    error: 'Invalid API Key. Check that WHOP_API_KEY has write permissions.',
-                    details: responseData
-                });
-            }
-
-            if (whopResponse.status === 403) {
-                return res.status(403).json({
-                    error: 'Access denied. Ensure the API key has permission to modify this product.',
-                    details: responseData
-                });
-            }
-
-            if (whopResponse.status === 404) {
-                return res.status(404).json({
-                    error: 'Product not found. The product ID may be invalid or deleted.',
-                    details: responseData
-                });
-            }
-
-            return res.status(whopResponse.status).json({
-                error: `Whop API error: ${responseData.message || responseData.error || 'Unknown error'}`,
-                details: responseData
-            });
-        }
+        const updatedCourse = await whop.courses.update(productId, {
+            description: newDescription
+        });
 
         // 6. SUCCESS
-        console.log(`✅ Product ${productId} updated successfully`);
+        console.log(`✅ Course ${productId} updated successfully`);
 
         return res.status(200).json({
             success: true,
-            message: 'Product description updated successfully on Whop!',
-            productId,
-            updatedProduct: responseData
+            message: 'Course description updated successfully on Whop!',
+            courseId: productId,
+            updatedCourse: updatedCourse
         });
 
     } catch (error: any) {
         console.error('❌ Update API Error:', error.message);
         console.error('Stack:', error.stack);
+
+        // Handle specific Whop API errors
+        if (error.message?.includes('401') || error.message?.includes('Unauthorized')) {
+            return res.status(401).json({
+                error: 'Invalid API Key. Check that WHOP_API_KEY has courses:update permission.',
+            });
+        }
+
+        if (error.message?.includes('403') || error.message?.includes('Forbidden')) {
+            return res.status(403).json({
+                error: 'Access denied. Ensure the API key has permission to modify this course.',
+            });
+        }
+
+        if (error.message?.includes('404') || error.message?.includes('Not Found')) {
+            return res.status(404).json({
+                error: 'Course not found. The course ID may be invalid or deleted.',
+            });
+        }
 
         return res.status(500).json({
             error: error.message || 'Internal Server Error',
