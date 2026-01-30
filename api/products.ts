@@ -5,7 +5,7 @@
  * Uses courses:read permission.
  */
 
-import { WhopServerSdk } from '@whop/sdk';
+import WhopServerSdk from '@whop/sdk';
 
 export default async function handler(req: any, res: any) {
     // 1. CORS & CACHE CONTROL
@@ -22,7 +22,7 @@ export default async function handler(req: any, res: any) {
 
     try {
         // 2. INITIALIZE SDK
-        const whop = WhopServerSdk({
+        const whop = new WhopServerSdk({
             apiKey: process.env.WHOP_API_KEY!,
         });
 
@@ -41,7 +41,7 @@ export default async function handler(req: any, res: any) {
         console.log('🔍 x-whop-company-id:', webHeaders.get('x-whop-company-id') ? 'Present' : 'MISSING');
 
         // 4. VERIFY USER TOKEN
-        const tokenResult = await whop.verifyUserToken({ headers: webHeaders });
+        const tokenResult = await whop.verifyUserToken(webHeaders);
 
         if (!tokenResult || !tokenResult.userId) {
             console.error("❌ Auth Failed: No userId in token result");
@@ -70,7 +70,7 @@ export default async function handler(req: any, res: any) {
         const allCourses: any[] = [];
 
         // Use async iterator pattern from SDK docs
-        for await (const course of whop.courses.list({ companyId })) {
+        for await (const course of whop.courses.list({ company_id: companyId })) {
             allCourses.push({
                 id: course.id,
                 name: course.title || 'Untitled Course',
