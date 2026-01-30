@@ -2,7 +2,7 @@
  * Marketing Content Generator API
  * 
  * Uses Groq AI to generate marketing content for courses.
- * Strict separator, very low temperature, and post-processing for 100% clean output.
+ * Ultra-strict formatting with comprehensive post-processing cleanup.
  */
 
 const GROQ_API_KEY = (process.env.GROQ_API_KEY || '').trim();
@@ -45,31 +45,29 @@ export default async function handler(req: any, res: any) {
 
     console.log(`⚡️ Groq Request: llama-3.1-8b-instant`);
 
-    // ULTRA-STRICT SYSTEM MESSAGE - NO LABELS ALLOWED
-    const systemMessage = `You are a professional marketing copywriter for online courses.
+    // ULTRA-STRICT SYSTEM PROMPT
+    const systemMessage = `You are a professional marketing copywriter for online courses on Whop.
 
-CRITICAL FORMAT RULES - VIOLATION WILL BREAK THE SYSTEM:
-1. Output ONLY raw content text - NO labels, NO headers, NO part numbers
-2. Separate the 6 sections using ONLY: ${SEP}
-3. NEVER write "Part 1:", "Twitter:", "Introduction:", "Email:", or ANY header
-4. NEVER use markdown headers like # or ##
-5. Start each section DIRECTLY with the content itself
+OUTPUT FORMAT - You must output exactly 6 raw text blocks separated by '${SEP}':
 
-YOUR OUTPUT MUST BE EXACTLY:
+1. TWITTER THREAD - 3-5 engaging tweets with hashtags. Start directly with the first tweet.
 
-[Raw Twitter thread content - 3-5 engaging tweets with hashtags]
-${SEP}
-[Raw sales email body - 2-3 paragraphs, professional tone]
-${SEP}
-[Raw course description - SEO-optimized, 2-3 paragraphs about benefits and what students learn]
-${SEP}
-[Raw announcement - Start with exciting title line, then body paragraph]
-${SEP}
-[Raw TikTok script - Hook, main points, CTA, under 60 seconds]
-${SEP}
-[Raw Instagram caption - 2-3 sentences with emojis and hashtags]
+2. SALES EMAIL - Professional email body only. NO "Subject:" line. NO "Dear [Name]" greeting. Start directly with the sales pitch.
 
-REMEMBER: Raw content ONLY. No labels. No headers. Just the text.`;
+3. COURSE DESCRIPTION - Landing page style. SEO-optimized. 2-3 paragraphs about course benefits and what students will learn. NO email formatting. NO greetings.
+
+4. COMMUNITY ANNOUNCEMENT - Exciting, concise announcement. First line is the title. NO "Subject:" line. NO email headers. Just the announcement text.
+
+5. TIKTOK SCRIPT - Short video script. Hook, main points, CTA. Under 60 seconds.
+
+6. INSTAGRAM CAPTION - 2-3 sentences with emojis and hashtags.
+
+CRITICAL RULES:
+- NEVER include "Part 1:", "Twitter:", "Email:" or any labels
+- NEVER include "Subject:", "Dear", "To:" in ANY section
+- NEVER use markdown headers (# or ##)
+- Start each section DIRECTLY with the content
+- Separate sections ONLY with ${SEP}`;
 
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -81,9 +79,9 @@ REMEMBER: Raw content ONLY. No labels. No headers. Just the text.`;
         model: 'llama-3.1-8b-instant',
         messages: [
           { role: "system", content: systemMessage },
-          { role: "user", content: `Generate marketing content for this course:\n\n${prompt}\n\nRemember: Raw content only, separated by ${SEP}. No labels or headers.` }
+          { role: "user", content: `Generate marketing content for this course:\n\n${prompt}\n\nRemember: 6 raw text blocks separated by ${SEP}. No labels, no email headers, no Subject lines.` }
         ],
-        temperature: 0.1,  // ULTRA-LOW for strictest format adherence
+        temperature: 0.1,  // Maximum precision
         max_tokens: 3000
       })
     });
@@ -101,13 +99,13 @@ REMEMBER: Raw content ONLY. No labels. No headers. Just the text.`;
     // Split by separator
     const parts = rawContent.split(SEP);
 
-    // POST-PROCESSING: Clean any lingering labels/headers that AI might have added
+    // DEEP CLEAN: Remove ALL unwanted labels and email formatting
     const cleanContent = (text: string): string => {
       return text
-        // Remove "Part X:" or "###Part X###" style labels
+        // Remove part labels
         .replace(/^(Part\s*\d+\s*:?\s*)/gi, '')
         .replace(/^###.*?###\s*/gi, '')
-        // Remove common header prefixes
+        // Remove section headers
         .replace(/^(Twitter\s*(Thread)?:?\s*)/gi, '')
         .replace(/^(Email\s*(Content)?:?\s*)/gi, '')
         .replace(/^(Sales\s*Email:?\s*)/gi, '')
@@ -119,9 +117,22 @@ REMEMBER: Raw content ONLY. No labels. No headers. Just the text.`;
         .replace(/^(Instagram\s*(Caption|Post)?:?\s*)/gi, '')
         .replace(/^(Introduction:?\s*)/gi, '')
         .replace(/^(Content:?\s*)/gi, '')
+        // Remove EMAIL-specific formatting (Subject, Dear, To lines)
+        .replace(/^Subject:.*$/gim, '')
+        .replace(/^Dear\s*\[?[^\]]*\]?,?\s*/gim, '')
+        .replace(/^Dear\s+\w+,?\s*/gim, '')
+        .replace(/^To:.*$/gim, '')
+        .replace(/^From:.*$/gim, '')
+        .replace(/^Hi\s*\[?[^\]]*\]?,?\s*/gim, '')
+        .replace(/^Hello\s*\[?[^\]]*\]?,?\s*/gim, '')
+        .replace(/^Hey\s*\[?[^\]]*\]?,?\s*/gim, '')
         // Remove markdown headers
         .replace(/^#+\s*/gm, '')
-        // Remove leading/trailing whitespace
+        // Remove asterisks used for bold/italic in markdown
+        .replace(/\*\*/g, '')
+        // Clean up extra newlines at start
+        .replace(/^\n+/, '')
+        // Final trim
         .trim();
     };
 
@@ -133,7 +144,7 @@ REMEMBER: Raw content ONLY. No labels. No headers. Just the text.`;
     // Extract cleaned content with fallbacks
     const twitter = cleanParts[0] || "Content generation failed. Please try again.";
     const email = cleanParts[1] || "Content generation failed. Please try again.";
-    const whopDescription = cleanParts[2] || email;  // Fallback to email
+    const whopDescription = cleanParts[2] || email;
     const announcement = cleanParts[3] || "";
     const tiktok = cleanParts[4] || "Content generation failed. Please try again.";
     const instagram = cleanParts[5] || "Content generation failed. Please try again.";
@@ -146,7 +157,7 @@ REMEMBER: Raw content ONLY. No labels. No headers. Just the text.`;
     console.log(`✅ Content generated and cleaned successfully`);
 
     return res.status(200).json({
-      // Legacy fields for compatibility
+      // Legacy fields
       twitter,
       email,
       instagram,
@@ -155,7 +166,7 @@ REMEMBER: Raw content ONLY. No labels. No headers. Just the text.`;
       salesEmail: email,
       instagramPost: instagram,
       tiktokScript: tiktok,
-      // Whop-specific content (PRIORITY - 100% CLEAN)
+      // Whop-specific (100% CLEAN)
       whopSalesDescription: whopDescription,
       announcementTitle,
       announcementBody
