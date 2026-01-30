@@ -2,7 +2,7 @@
  * Marketing Content Generator API
  * 
  * Uses Groq AI to generate marketing content for courses.
- * Strict separator and low temperature for content isolation.
+ * Strict separator, very low temperature, and post-processing for 100% clean output.
  */
 
 const GROQ_API_KEY = (process.env.GROQ_API_KEY || '').trim();
@@ -45,44 +45,31 @@ export default async function handler(req: any, res: any) {
 
     console.log(`⚡️ Groq Request: llama-3.1-8b-instant`);
 
-    const systemMessage = `You are a specialized marketing content engine for Whop course sellers.
+    // ULTRA-STRICT SYSTEM MESSAGE - NO LABELS ALLOWED
+    const systemMessage = `You are a professional marketing copywriter for online courses.
 
-CRITICAL RULES:
-1. Output EXACTLY 6 parts separated by: ${SEP}
-2. Do NOT bleed content between parts
-3. Each part must be COMPLETELY SEPARATE
-4. Do NOT use tags like [Email Content] or [Twitter]. Just raw text.
-5. Do NOT use markdown headers or code blocks
+CRITICAL FORMAT RULES - VIOLATION WILL BREAK THE SYSTEM:
+1. Output ONLY raw content text - NO labels, NO headers, NO part numbers
+2. Separate the 6 sections using ONLY: ${SEP}
+3. NEVER write "Part 1:", "Twitter:", "Introduction:", "Email:", or ANY header
+4. NEVER use markdown headers like # or ##
+5. Start each section DIRECTLY with the content itself
 
-OUTPUT FORMAT (6 parts in this EXACT order):
+YOUR OUTPUT MUST BE EXACTLY:
 
-PART 1 - TWITTER THREAD:
-3-5 engaging tweets about the course. Include hashtags.
-
+[Raw Twitter thread content - 3-5 engaging tweets with hashtags]
 ${SEP}
-
-PART 2 - SALES EMAIL:
-Professional email body to promote the course. 2-3 paragraphs.
-
+[Raw sales email body - 2-3 paragraphs, professional tone]
 ${SEP}
-
-PART 3 - WHOP COURSE DESCRIPTION:
-SEO-optimized, compelling sales description for the Whop course landing page. 2-3 paragraphs. Focus on benefits, what students will learn, and why they should enroll.
-
+[Raw course description - SEO-optimized, 2-3 paragraphs about benefits and what students learn]
 ${SEP}
-
-PART 4 - WHOP COMMUNITY ANNOUNCEMENT:
-Exciting announcement for the Whop community about this course. Start with an attention-grabbing title, then the body. 1-2 paragraphs.
-
+[Raw announcement - Start with exciting title line, then body paragraph]
 ${SEP}
-
-PART 5 - TIKTOK SCRIPT:
-Short, engaging video script for TikTok. Include hook, main points, and call-to-action. Under 60 seconds.
-
+[Raw TikTok script - Hook, main points, CTA, under 60 seconds]
 ${SEP}
+[Raw Instagram caption - 2-3 sentences with emojis and hashtags]
 
-PART 6 - INSTAGRAM CAPTION:
-Engaging Instagram caption with emojis and relevant hashtags. 2-3 sentences max.`;
+REMEMBER: Raw content ONLY. No labels. No headers. Just the text.`;
 
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -94,9 +81,9 @@ Engaging Instagram caption with emojis and relevant hashtags. 2-3 sentences max.
         model: 'llama-3.1-8b-instant',
         messages: [
           { role: "system", content: systemMessage },
-          { role: "user", content: `Generate marketing content for this course:\n\n${prompt}\n\nRemember: Separate each of the 6 parts with ${SEP}` }
+          { role: "user", content: `Generate marketing content for this course:\n\n${prompt}\n\nRemember: Raw content only, separated by ${SEP}. No labels or headers.` }
         ],
-        temperature: 0.3,  // Lower temperature for stricter formatting
+        temperature: 0.1,  // ULTRA-LOW for strictest format adherence
         max_tokens: 3000
       })
     });
@@ -107,29 +94,56 @@ Engaging Instagram caption with emojis and relevant hashtags. 2-3 sentences max.
     }
 
     const data = await response.json();
-    const textAnswer = data.choices?.[0]?.message?.content || "";
+    const rawContent = data.choices?.[0]?.message?.content || "";
 
-    console.log("📝 Raw Response Length:", textAnswer.length);
+    console.log("📝 Raw Response Length:", rawContent.length);
 
     // Split by separator
-    const parts = textAnswer.split(SEP).map((p: string) => p.trim());
+    const parts = rawContent.split(SEP);
 
-    console.log(`📊 Parsed ${parts.length} parts`);
+    // POST-PROCESSING: Clean any lingering labels/headers that AI might have added
+    const cleanContent = (text: string): string => {
+      return text
+        // Remove "Part X:" or "###Part X###" style labels
+        .replace(/^(Part\s*\d+\s*:?\s*)/gi, '')
+        .replace(/^###.*?###\s*/gi, '')
+        // Remove common header prefixes
+        .replace(/^(Twitter\s*(Thread)?:?\s*)/gi, '')
+        .replace(/^(Email\s*(Content)?:?\s*)/gi, '')
+        .replace(/^(Sales\s*Email:?\s*)/gi, '')
+        .replace(/^(Course\s*Description:?\s*)/gi, '')
+        .replace(/^(Whop\s*Description:?\s*)/gi, '')
+        .replace(/^(Announcement:?\s*)/gi, '')
+        .replace(/^(Community\s*Announcement:?\s*)/gi, '')
+        .replace(/^(TikTok\s*(Script)?:?\s*)/gi, '')
+        .replace(/^(Instagram\s*(Caption|Post)?:?\s*)/gi, '')
+        .replace(/^(Introduction:?\s*)/gi, '')
+        .replace(/^(Content:?\s*)/gi, '')
+        // Remove markdown headers
+        .replace(/^#+\s*/gm, '')
+        // Remove leading/trailing whitespace
+        .trim();
+    };
 
-    // Parse each part with fallbacks
-    const twitter = parts[0] || "Content generation failed. Please try again.";
-    const email = parts[1] || "Content generation failed. Please try again.";
-    const whopDescription = parts[2] || email;  // Fallback to email
-    const announcement = parts[3] || "";
-    const tiktok = parts[4] || "Content generation failed. Please try again.";
-    const instagram = parts[5] || "Content generation failed. Please try again.";
+    // Clean each part
+    const cleanParts = parts.map(p => cleanContent(p));
+
+    console.log(`📊 Parsed and cleaned ${cleanParts.length} parts`);
+
+    // Extract cleaned content with fallbacks
+    const twitter = cleanParts[0] || "Content generation failed. Please try again.";
+    const email = cleanParts[1] || "Content generation failed. Please try again.";
+    const whopDescription = cleanParts[2] || email;  // Fallback to email
+    const announcement = cleanParts[3] || "";
+    const tiktok = cleanParts[4] || "Content generation failed. Please try again.";
+    const instagram = cleanParts[5] || "Content generation failed. Please try again.";
 
     // Parse announcement (first line = title, rest = body)
     const announcementLines = announcement.split('\n').filter((l: string) => l.trim());
-    const announcementTitle = announcementLines[0]?.trim() || "🚀 New Course Available!";
+    const announcementTitle = cleanContent(announcementLines[0] || "🚀 New Course Available!");
     const announcementBody = announcementLines.slice(1).join('\n').trim() || announcement;
 
-    console.log(`✅ Content generated successfully`);
+    console.log(`✅ Content generated and cleaned successfully`);
 
     return res.status(200).json({
       // Legacy fields for compatibility
@@ -141,7 +155,7 @@ Engaging Instagram caption with emojis and relevant hashtags. 2-3 sentences max.
       salesEmail: email,
       instagramPost: instagram,
       tiktokScript: tiktok,
-      // Whop-specific content (PRIORITY)
+      // Whop-specific content (PRIORITY - 100% CLEAN)
       whopSalesDescription: whopDescription,
       announcementTitle,
       announcementBody
