@@ -1,9 +1,11 @@
 /**
  * Whop Courses API
  * 
- * Lists courses for the company using direct API call.
+ * Lists courses for the company using Whop SDK.
  * Uses courses:read permission.
  */
+
+import { WhopServerSdk } from '@whop/sdk';
 
 export default async function handler(req: any, res: any) {
     // 1. CORS & CACHE CONTROL
@@ -19,60 +21,68 @@ export default async function handler(req: any, res: any) {
     }
 
     try {
-        // 2. GET API KEY
-        const apiKey = process.env.WHOP_API_KEY;
-        if (!apiKey) {
-            console.error('❌ WHOP_API_KEY is not set');
-            return res.status(500).json({ error: 'Server configuration error: API key not configured.' });
-        }
-
-        // 3. GET COMPANY ID FROM HEADERS
-        const companyId = req.headers['x-whop-company-id'];
-        console.log(`🏢 Company ID from header: ${companyId || 'NOT FOUND'}`);
-
-        // 4. FETCH COURSES DIRECTLY FROM WHOP API
-        let apiUrl = 'https://api.whop.com/api/v5/courses';
-        if (companyId) {
-            apiUrl += `?company_id=${companyId}`;
-        }
-
-        console.log(`📡 Fetching courses from: ${apiUrl}`);
-
-        const response = await fetch(apiUrl, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${apiKey}`,
-                'Content-Type': 'application/json'
-            }
+        // 2. INITIALIZE SDK
+        const whop = WhopServerSdk({
+            apiKey: process.env.WHOP_API_KEY!,
         });
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error(`❌ Whop API Error (${response.status}):`, errorText);
-            return res.status(response.status).json({
-                error: `Whop API error: ${response.status}`,
-                details: errorText
+        // 3. CONVERT HEADERS TO WEB API FORMAT
+        const webHeaders = new Headers();
+        for (const [key, value] of Object.entries(req.headers)) {
+            if (typeof value === 'string') {
+                webHeaders.set(key, value);
+            } else if (Array.isArray(value)) {
+                webHeaders.set(key, value[0]);
+            }
+        }
+
+        // Debug: Log important headers
+        console.log('🔍 x-whop-user-token:', webHeaders.get('x-whop-user-token') ? 'Present' : 'MISSING');
+        console.log('🔍 x-whop-company-id:', webHeaders.get('x-whop-company-id') ? 'Present' : 'MISSING');
+
+        // 4. VERIFY USER TOKEN
+        const tokenResult = await whop.verifyUserToken({ headers: webHeaders });
+
+        if (!tokenResult || !tokenResult.userId) {
+            console.error("❌ Auth Failed: No userId in token result");
+            return res.status(401).json({
+                error: 'Authentication failed. Please open this app inside Whop Dashboard.'
             });
         }
 
-        const data = await response.json();
-        console.log(`📦 Raw API response:`, JSON.stringify(data, null, 2));
+        const userId = tokenResult.userId;
+        console.log(`✅ User verified: ${userId}`);
 
-        // Extract courses from response
-        const courses = data.data || data || [];
+        // 5. GET COMPANY ID
+        const companyId = webHeaders.get('x-whop-company-id');
+        console.log(`🏢 Company ID from header: ${companyId || 'NOT FOUND'}`);
 
-        // Map courses to match expected format (id, name/title)
-        const mappedCourses = Array.isArray(courses) ? courses.map((course: any) => ({
-            id: course.id,
-            name: course.title || course.name,
-            title: course.title,
-            description: course.description,
-            visibility: course.visibility,
-            tagline: course.tagline
-        })) : [];
+        if (!companyId) {
+            console.error("❌ No x-whop-company-id header");
+            return res.status(403).json({
+                error: 'Company ID not found. Ensure app is accessed from Whop Dashboard.'
+            });
+        }
 
-        console.log(`✅ Returning ${mappedCourses.length} courses`);
-        return res.status(200).json(mappedCourses);
+        // 6. FETCH COURSES
+        console.log(`📡 Fetching courses for company: ${companyId}`);
+
+        const allCourses: any[] = [];
+
+        // Use async iterator pattern from SDK docs
+        for await (const course of whop.courses.list({ companyId })) {
+            allCourses.push({
+                id: course.id,
+                name: course.title || 'Untitled Course',
+                title: course.title,
+                description: course.description,
+                visibility: course.visibility,
+                tagline: course.tagline
+            });
+        }
+
+        console.log(`✅ Returning ${allCourses.length} courses`);
+        return res.status(200).json(allCourses);
 
     } catch (error: any) {
         console.error('❌ API Error:', error.message);
