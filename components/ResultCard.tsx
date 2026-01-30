@@ -27,12 +27,6 @@ const TikTokIcon: React.FC<{ className?: string }> = ({ className }) => (
   </svg>
 );
 
-const EmailIcon: React.FC<{ className?: string }> = ({ className }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-  </svg>
-);
-
 const WhopIcon: React.FC<{ className?: string }> = ({ className }) => (
   <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="currentColor" viewBox="0 0 24 24">
     <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
@@ -145,95 +139,14 @@ const ResultCard: React.FC<ResultCardProps> = ({ result, courseId, companyId, on
 
   return (
     <div className="w-full max-w-2xl mt-8 space-y-6">
-      {/* === SECTION: SOCIAL MEDIA (Copy Only) === */}
-      <div className="mb-4">
-        <h2 className="text-lg font-semibold text-gray-400 mb-4 flex items-center gap-2">
-          <span className="w-2 h-2 bg-blue-400 rounded-full"></span>
-          Social Media Content
-        </h2>
 
-        {/* Twitter Thread Card */}
-        <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-lg shadow-lg p-6 mb-4">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl font-semibold text-gray-100 flex items-center">
-              <TwitterIcon className="w-6 h-6 mr-2 text-blue-400" />
-              Twitter Thread
-            </h3>
-            <button
-              onClick={() => handleCopy(result.twitterThread, 'twitter')}
-              className="flex items-center gap-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 px-4 py-2 rounded-lg transition-all border border-blue-500/30"
-            >
-              {copiedSection === 'twitter' ? <><CheckIcon className="w-4 h-4" /> Copied!</> : <><CopyIcon className="w-4 h-4" /> Copy</>}
-            </button>
-          </div>
-          <div className="bg-gray-900/50 rounded-lg p-4 text-gray-300 whitespace-pre-wrap text-sm">
-            {result.twitterThread}
-          </div>
-        </div>
-
-        {/* Instagram Post Card */}
-        <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-lg shadow-lg p-6 mb-4">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl font-semibold text-gray-100 flex items-center">
-              <InstagramIcon className="w-6 h-6 mr-2 text-pink-400" />
-              Instagram Post
-            </h3>
-            <button
-              onClick={() => handleCopy(result.instagramPost, 'instagram')}
-              className="flex items-center gap-2 bg-pink-500/20 hover:bg-pink-500/30 text-pink-300 px-4 py-2 rounded-lg transition-all border border-pink-500/30"
-            >
-              {copiedSection === 'instagram' ? <><CheckIcon className="w-4 h-4" /> Copied!</> : <><CopyIcon className="w-4 h-4" /> Copy</>}
-            </button>
-          </div>
-          <div className="bg-gray-900/50 rounded-lg p-4 text-gray-300 whitespace-pre-wrap text-sm">
-            {result.instagramPost}
-          </div>
-        </div>
-
-        {/* TikTok Script Card */}
-        <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-lg shadow-lg p-6 mb-4">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl font-semibold text-gray-100 flex items-center">
-              <TikTokIcon className="w-6 h-6 mr-2 text-purple-400" />
-              TikTok Script
-            </h3>
-            <button
-              onClick={() => handleCopy(result.tiktokScript, 'tiktok')}
-              className="flex items-center gap-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 px-4 py-2 rounded-lg transition-all border border-purple-500/30"
-            >
-              {copiedSection === 'tiktok' ? <><CheckIcon className="w-4 h-4" /> Copied!</> : <><CopyIcon className="w-4 h-4" /> Copy</>}
-            </button>
-          </div>
-          <div className="bg-gray-900/50 rounded-lg p-4 text-gray-300 whitespace-pre-wrap text-sm">
-            {result.tiktokScript}
-          </div>
-        </div>
-
-        {/* Email Template Card */}
-        <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-lg shadow-lg p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl font-semibold text-gray-100 flex items-center">
-              <EmailIcon className="w-6 h-6 mr-2 text-green-400" />
-              Sales Email
-            </h3>
-            <button
-              onClick={() => handleCopy(result.salesEmail, 'email')}
-              className="flex items-center gap-2 bg-green-500/20 hover:bg-green-500/30 text-green-300 px-4 py-2 rounded-lg transition-all border border-green-500/30"
-            >
-              {copiedSection === 'email' ? <><CheckIcon className="w-4 h-4" /> Copied!</> : <><CopyIcon className="w-4 h-4" /> Copy</>}
-            </button>
-          </div>
-          <div className="bg-gray-900/50 rounded-lg p-4 text-gray-300 whitespace-pre-wrap text-sm">
-            {result.salesEmail}
-          </div>
-        </div>
-      </div>
-
-      {/* === SECTION: WHOP NATIVE ACTIONS === */}
-      <div className="mt-8">
-        <h2 className="text-lg font-semibold text-gray-400 mb-4 flex items-center gap-2">
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {/* === SECTION 1: WHOP NATIVE ACTIONS (PRIORITY - AT THE TOP) === */}
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      <div className="mb-8">
+        <h2 className="text-lg font-semibold text-indigo-400 mb-4 flex items-center gap-2">
           <span className="w-2 h-2 bg-indigo-500 rounded-full"></span>
-          Whop Native Actions
+          ⚡ Whop Native Actions
         </h2>
 
         {/* Whop Course Description Card */}
@@ -300,6 +213,74 @@ const ResultCard: React.FC<ResultCardProps> = ({ result, courseId, companyId, on
             <div className="whitespace-pre-wrap text-sm">{result.whopAnnouncement.body}</div>
           </div>
         </div>
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {/* === SECTION 2: SOCIAL DISTRIBUTION (Copy Only - At the Bottom) === */}
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      <div className="pt-6 border-t border-gray-700">
+        <h2 className="text-lg font-semibold text-gray-400 mb-4 flex items-center gap-2">
+          <span className="w-2 h-2 bg-blue-400 rounded-full"></span>
+          📱 Social Distribution
+        </h2>
+
+        {/* Twitter Thread Card */}
+        <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-lg shadow-lg p-6 mb-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xl font-semibold text-gray-100 flex items-center">
+              <TwitterIcon className="w-6 h-6 mr-2 text-blue-400" />
+              Twitter Thread
+            </h3>
+            <button
+              onClick={() => handleCopy(result.twitterThread, 'twitter')}
+              className="flex items-center gap-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 px-4 py-2 rounded-lg transition-all border border-blue-500/30"
+            >
+              {copiedSection === 'twitter' ? <><CheckIcon className="w-4 h-4" /> Copied!</> : <><CopyIcon className="w-4 h-4" /> Copy</>}
+            </button>
+          </div>
+          <div className="bg-gray-900/50 rounded-lg p-4 text-gray-300 whitespace-pre-wrap text-sm">
+            {result.twitterThread}
+          </div>
+        </div>
+
+        {/* TikTok Script Card */}
+        <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-lg shadow-lg p-6 mb-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xl font-semibold text-gray-100 flex items-center">
+              <TikTokIcon className="w-6 h-6 mr-2 text-purple-400" />
+              TikTok Script
+            </h3>
+            <button
+              onClick={() => handleCopy(result.tiktokScript, 'tiktok')}
+              className="flex items-center gap-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 px-4 py-2 rounded-lg transition-all border border-purple-500/30"
+            >
+              {copiedSection === 'tiktok' ? <><CheckIcon className="w-4 h-4" /> Copied!</> : <><CopyIcon className="w-4 h-4" /> Copy</>}
+            </button>
+          </div>
+          <div className="bg-gray-900/50 rounded-lg p-4 text-gray-300 whitespace-pre-wrap text-sm">
+            {result.tiktokScript}
+          </div>
+        </div>
+
+        {/* Instagram Post Card */}
+        <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-lg shadow-lg p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xl font-semibold text-gray-100 flex items-center">
+              <InstagramIcon className="w-6 h-6 mr-2 text-pink-400" />
+              Instagram Caption
+            </h3>
+            <button
+              onClick={() => handleCopy(result.instagramPost, 'instagram')}
+              className="flex items-center gap-2 bg-pink-500/20 hover:bg-pink-500/30 text-pink-300 px-4 py-2 rounded-lg transition-all border border-pink-500/30"
+            >
+              {copiedSection === 'instagram' ? <><CheckIcon className="w-4 h-4" /> Copied!</> : <><CopyIcon className="w-4 h-4" /> Copy</>}
+            </button>
+          </div>
+          <div className="bg-gray-900/50 rounded-lg p-4 text-gray-300 whitespace-pre-wrap text-sm">
+            {result.instagramPost}
+          </div>
+        </div>
+
       </div>
     </div>
   );

@@ -1,7 +1,12 @@
+/**
+ * Marketing Content Generator API
+ * 
+ * Uses Groq AI to generate marketing content for courses.
+ * Strict separator and low temperature for content isolation.
+ */
 
 const GROQ_API_KEY = (process.env.GROQ_API_KEY || '').trim();
-
-const DELIMITER = '|||PART|||';
+const SEP = '###NEXT_PART###';
 
 export default async function handler(req: any, res: any) {
   // CORS
@@ -12,36 +17,72 @@ export default async function handler(req: any, res: any) {
 
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  // Helper to return error
   const returnError = (msg: string) => {
-    console.error(`❌ HATA: ${msg}`);
+    console.error(`❌ ERROR: ${msg}`);
     return res.status(200).json({
-      twitter: `⚠️ Hata: ${msg}`,
-      email: `⚠️ Hata: ${msg}`,
-      instagram: `⚠️ Hata: ${msg}`,
-      tiktok: `⚠️ Hata: ${msg}`,
-      twitterThread: `⚠️ Hata: ${msg}`,
-      salesEmail: `⚠️ Hata: ${msg}`,
-      instagramPost: `⚠️ Hata: ${msg}`,
-      tiktokScript: `⚠️ Hata: ${msg}`
+      twitter: `⚠️ Error: ${msg}`,
+      email: `⚠️ Error: ${msg}`,
+      instagram: `⚠️ Error: ${msg}`,
+      tiktok: `⚠️ Error: ${msg}`,
+      whopSalesDescription: `⚠️ Error: ${msg}`,
+      announcementTitle: 'Error',
+      announcementBody: msg
     });
   };
 
-  if (req.method !== 'POST') return returnError('Sadece POST isteği.');
+  if (req.method !== 'POST') return returnError('POST only.');
 
   try {
     if (!GROQ_API_KEY) {
-      return returnError('GROQ_API_KEY eksik. Vercel ayarlarını kontrol edin.');
+      return returnError('GROQ_API_KEY missing.');
     }
 
     if (!req.body || !req.body.prompt) {
-      return returnError('Prompt verisi gelmedi.');
+      return returnError('No prompt provided.');
     }
 
     const { prompt } = req.body;
-    const model = 'llama-3.1-8b-instant';
 
-    console.log(`⚡️ Groq İsteği: ${model}`);
+    console.log(`⚡️ Groq Request: llama-3.1-8b-instant`);
+
+    const systemMessage = `You are a specialized marketing content engine for Whop course sellers.
+
+CRITICAL RULES:
+1. Output EXACTLY 6 parts separated by: ${SEP}
+2. Do NOT bleed content between parts
+3. Each part must be COMPLETELY SEPARATE
+4. Do NOT use tags like [Email Content] or [Twitter]. Just raw text.
+5. Do NOT use markdown headers or code blocks
+
+OUTPUT FORMAT (6 parts in this EXACT order):
+
+PART 1 - TWITTER THREAD:
+3-5 engaging tweets about the course. Include hashtags.
+
+${SEP}
+
+PART 2 - SALES EMAIL:
+Professional email body to promote the course. 2-3 paragraphs.
+
+${SEP}
+
+PART 3 - WHOP COURSE DESCRIPTION:
+SEO-optimized, compelling sales description for the Whop course landing page. 2-3 paragraphs. Focus on benefits, what students will learn, and why they should enroll.
+
+${SEP}
+
+PART 4 - WHOP COMMUNITY ANNOUNCEMENT:
+Exciting announcement for the Whop community about this course. Start with an attention-grabbing title, then the body. 1-2 paragraphs.
+
+${SEP}
+
+PART 5 - TIKTOK SCRIPT:
+Short, engaging video script for TikTok. Include hook, main points, and call-to-action. Under 60 seconds.
+
+${SEP}
+
+PART 6 - INSTAGRAM CAPTION:
+Engaging Instagram caption with emojis and relevant hashtags. 2-3 sentences max.`;
 
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -50,72 +91,48 @@ export default async function handler(req: any, res: any) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: model,
+        model: 'llama-3.1-8b-instant',
         messages: [
-          {
-            role: "system",
-            content: `You are a marketing content generator for online courses. Generate content in plain text format.
-            
-IMPORTANT: Separate each section with exactly: ${DELIMITER}
-
-Format your response EXACTLY like this (6 sections total):
-[Twitter content here - 3-5 tweet thread]
-${DELIMITER}
-[Email content here - professional sales email]
-${DELIMITER}
-[Instagram caption here with hashtags]
-${DELIMITER}
-[TikTok script here - engaging video script]
-${DELIMITER}
-[Whop Course Description - SEO-optimized, compelling sales description for the course landing page, 2-3 paragraphs]
-${DELIMITER}
-[Announcement Title]|||[Announcement Body - exciting community announcement about this course, 1-2 paragraphs]
-
-Do NOT use JSON. Do NOT use markdown code blocks. Just plain text with the delimiter between sections.`
-          },
-          {
-            role: "user",
-            content: `Generate marketing content for this course:
-            
-${prompt}
-
-Remember: Use ${DELIMITER} between each section (Twitter, Email, Instagram, TikTok, Whop Description, Announcement).`
-          }
+          { role: "system", content: systemMessage },
+          { role: "user", content: `Generate marketing content for this course:\n\n${prompt}\n\nRemember: Separate each of the 6 parts with ${SEP}` }
         ],
-        temperature: 0.7,
+        temperature: 0.3,  // Lower temperature for stricter formatting
         max_tokens: 3000
       })
     });
 
     if (!response.ok) {
       const errText = await response.text();
-      return returnError(`Groq API Hatası (${response.status}): ${errText.substring(0, 100)}`);
+      return returnError(`Groq API Error (${response.status}): ${errText.substring(0, 100)}`);
     }
 
     const data = await response.json();
     const textAnswer = data.choices?.[0]?.message?.content || "";
 
-    console.log("📝 Ham Yanıt Uzunluğu:", textAnswer.length);
+    console.log("📝 Raw Response Length:", textAnswer.length);
 
-    // Split by delimiter
-    const parts = textAnswer.split(DELIMITER).map((p: string) => p.trim());
+    // Split by separator
+    const parts = textAnswer.split(SEP).map((p: string) => p.trim());
 
-    // Fallback for partial responses
-    const twitter = parts[0] || "İçerik oluşturulamadı. Lütfen tekrar deneyin.";
-    const email = parts[1] || "İçerik oluşturulamadı. Lütfen tekrar deneyin.";
-    const instagram = parts[2] || "İçerik oluşturulamadı. Lütfen tekrar deneyin.";
-    const tiktok = parts[3] || "İçerik oluşturulamadı. Lütfen tekrar deneyin.";
-    const whopDescription = parts[4] || email;  // Fallback to email if missing
+    console.log(`📊 Parsed ${parts.length} parts`);
 
-    // Parse announcement (format: Title|||Body)
-    const announcementRaw = parts[5] || "";
-    const announcementParts = announcementRaw.split('|||');
-    const announcementTitle = announcementParts[0]?.trim() || "🚀 New Course Available!";
-    const announcementBody = announcementParts[1]?.trim() || email;
+    // Parse each part with fallbacks
+    const twitter = parts[0] || "Content generation failed. Please try again.";
+    const email = parts[1] || "Content generation failed. Please try again.";
+    const whopDescription = parts[2] || email;  // Fallback to email
+    const announcement = parts[3] || "";
+    const tiktok = parts[4] || "Content generation failed. Please try again.";
+    const instagram = parts[5] || "Content generation failed. Please try again.";
 
-    console.log(`✅ Parsed ${parts.length} sections`);
+    // Parse announcement (first line = title, rest = body)
+    const announcementLines = announcement.split('\n').filter((l: string) => l.trim());
+    const announcementTitle = announcementLines[0]?.trim() || "🚀 New Course Available!";
+    const announcementBody = announcementLines.slice(1).join('\n').trim() || announcement;
+
+    console.log(`✅ Content generated successfully`);
 
     return res.status(200).json({
+      // Legacy fields for compatibility
       twitter,
       email,
       instagram,
@@ -124,13 +141,13 @@ Remember: Use ${DELIMITER} between each section (Twitter, Email, Instagram, TikT
       salesEmail: email,
       instagramPost: instagram,
       tiktokScript: tiktok,
-      // Whop-specific content
+      // Whop-specific content (PRIORITY)
       whopSalesDescription: whopDescription,
       announcementTitle,
       announcementBody
     });
 
   } catch (error: any) {
-    return returnError(`Sunucu hatası: ${error.message}`);
+    return returnError(`Server error: ${error.message}`);
   }
 }
