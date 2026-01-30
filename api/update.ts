@@ -56,10 +56,11 @@ export default async function handler(req: any, res: any) {
             });
         }
 
-        // 4. UPDATE PRODUCT VIA WHOP API V5
-        console.log(`📝 Updating product ${productId} description...`);
+        // 4. UPDATE COURSE VIA WHOP API V5
+        console.log(`📝 Updating course ${productId} description...`);
 
-        const whopResponse = await fetch(`https://api.whop.com/api/v5/company/products/${productId}`, {
+        // Try courses endpoint first (matches courses:update permission)
+        const whopResponse = await fetch(`https://api.whop.com/api/v5/company/courses/${productId}`, {
             method: 'PUT',
             headers: {
                 'Authorization': `Bearer ${apiKey}`,

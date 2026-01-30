@@ -75,20 +75,20 @@ export default async function handler(req: any, res: any) {
 
         console.log(`✅ Access confirmed for company: ${companyId}`);
 
-        // 7. FETCH PRODUCTS
-        const productResponse = await whop.products.list({ company_id: companyId });
+        // 7. FETCH COURSES (using courses:read permission)
+        const courseResponse = await whop.courses.list({ company_id: companyId });
 
         // Debug: Log raw response
-        console.log(`📦 Raw product response:`, JSON.stringify(productResponse, null, 2));
+        console.log(`📦 Raw course response:`, JSON.stringify(courseResponse, null, 2));
 
-        const allProducts = (productResponse as any).data ||
-            (Array.isArray(productResponse) ? productResponse : []);
+        const allCourses = (courseResponse as any).data ||
+            (Array.isArray(courseResponse) ? courseResponse : []);
 
-        console.log(`📦 Found ${allProducts.length} total products`);
+        console.log(`📦 Found ${allCourses.length} total courses`);
 
         // 8. RETURN ALL - No filtering for now (debug)
-        console.log(`✅ Returning ${allProducts.length} products`);
-        return res.status(200).json(allProducts);
+        console.log(`✅ Returning ${allCourses.length} courses`);
+        return res.status(200).json(allCourses);
 
     } catch (error: any) {
         console.error("❌ API Error:", error.message);
