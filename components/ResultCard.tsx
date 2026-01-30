@@ -263,7 +263,7 @@ const ResultCard: React.FC<ResultCardProps> = ({ result, courseId, companyId, on
         </div>
 
         {/* Instagram Post Card */}
-        <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-lg shadow-lg p-6">
+        <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-lg shadow-lg p-6 mb-4">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-xl font-semibold text-gray-100 flex items-center">
               <InstagramIcon className="w-6 h-6 mr-2 text-pink-400" />
@@ -278,6 +278,27 @@ const ResultCard: React.FC<ResultCardProps> = ({ result, courseId, companyId, on
           </div>
           <div className="bg-gray-900/50 rounded-lg p-4 text-gray-300 whitespace-pre-wrap text-sm">
             {result.instagramPost}
+          </div>
+        </div>
+
+        {/* Sales Email Card - RESTORED */}
+        <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-lg shadow-lg p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xl font-semibold text-gray-100 flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 mr-2 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              Sales Email
+            </h3>
+            <button
+              onClick={() => handleCopy(result.salesEmail, 'email')}
+              className="flex items-center gap-2 bg-green-500/20 hover:bg-green-500/30 text-green-300 px-4 py-2 rounded-lg transition-all border border-green-500/30"
+            >
+              {copiedSection === 'email' ? <><CheckIcon className="w-4 h-4" /> Copied!</> : <><CopyIcon className="w-4 h-4" /> Copy</>}
+            </button>
+          </div>
+          <div className="bg-gray-900/50 rounded-lg p-4 text-gray-300 whitespace-pre-wrap text-sm">
+            {result.salesEmail}
           </div>
         </div>
 
