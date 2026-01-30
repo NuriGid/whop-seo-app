@@ -1,10 +1,10 @@
 /**
- * Whop Course Update API
+ * Whop Community Announcement API
  * 
- * Updates a course's description on Whop.
- * Uses PUT https://api.whop.com/api/v5/courses/{courseId}
+ * Posts a marketing announcement to the Whop community.
+ * Uses POST https://api.whop.com/api/v5/company/announcements
  * 
- * Required permission: courses:update
+ * Required permission: announcements:create (or similar)
  */
 
 export default async function handler(req: any, res: any) {
@@ -27,15 +27,15 @@ export default async function handler(req: any, res: any) {
     }
 
     try {
-        const { courseId, newDescription } = req.body;
+        const { title, body, companyId } = req.body;
 
         // Validate input
-        if (!courseId) {
-            return res.status(400).json({ error: 'Missing required field: courseId' });
+        if (!title || typeof title !== 'string') {
+            return res.status(400).json({ error: 'Missing or invalid field: title' });
         }
 
-        if (!newDescription || typeof newDescription !== 'string') {
-            return res.status(400).json({ error: 'Missing or invalid field: newDescription' });
+        if (!body || typeof body !== 'string') {
+            return res.status(400).json({ error: 'Missing or invalid field: body' });
         }
 
         // Get Admin API Key
@@ -47,16 +47,20 @@ export default async function handler(req: any, res: any) {
             });
         }
 
-        // PUT to Whop API v5
-        console.log(`📝 Updating course ${courseId} description...`);
+        // POST to Whop API v5 - Announcements
+        console.log(`📢 Creating announcement: "${title}"...`);
 
-        const response = await fetch(`https://api.whop.com/api/v5/courses/${courseId}`, {
-            method: 'PUT',
+        const response = await fetch('https://api.whop.com/api/v5/company/announcements', {
+            method: 'POST',
             headers: {
                 'Authorization': `Bearer ${apiKey}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ description: newDescription })
+            body: JSON.stringify({
+                title,
+                body,
+                ...(companyId && { company_id: companyId })
+            })
         });
 
         const data = await response.json();
@@ -65,20 +69,20 @@ export default async function handler(req: any, res: any) {
             console.error(`❌ Whop API Error (${response.status}):`, data);
             return res.status(response.status).json({
                 success: false,
-                error: data.message || data.error || 'Failed to update course',
+                error: data.message || data.error || 'Failed to create announcement',
                 details: data
             });
         }
 
-        console.log(`✅ Course ${courseId} updated successfully`);
+        console.log(`✅ Announcement created successfully`);
         return res.status(200).json({
             success: true,
-            message: 'Course description updated on Whop!',
+            message: 'Announcement published on Whop!',
             data
         });
 
     } catch (error: any) {
-        console.error('❌ Update API Error:', error.message);
+        console.error('❌ Announce API Error:', error.message);
         return res.status(500).json({
             success: false,
             error: error.message || 'Internal Server Error'

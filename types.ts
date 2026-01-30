@@ -4,6 +4,12 @@ export interface AnalysisResult {
   salesEmail: string;
   instagramPost: string;
   tiktokScript: string;
+  // Whop-specific content
+  whopSalesDescription: string;
+  whopAnnouncement: {
+    title: string;
+    body: string;
+  };
 }
 
 export interface WhopProduct {

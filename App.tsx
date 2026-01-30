@@ -230,7 +230,13 @@ const App: React.FC = () => {
         twitterThread: result.twitterThread || result.twitter || "No content generated.",
         salesEmail: result.salesEmail || result.email || "No content generated.",
         instagramPost: result.instagramPost || result.instagram || "No content generated.",
-        tiktokScript: result.tiktokScript || result.tiktok || "No content generated."
+        tiktokScript: result.tiktokScript || result.tiktok || "No content generated.",
+        // Whop-specific content
+        whopSalesDescription: result.whopSalesDescription || result.salesDescription || result.courseDescription || state.courseDescription,
+        whopAnnouncement: {
+          title: result.announcementTitle || result.whopAnnouncement?.title || `🚀 ${state.selectedProduct?.name || state.selectedProduct?.title} is NOW LIVE!`,
+          body: result.announcementBody || result.whopAnnouncement?.body || result.salesEmail || "Check out our latest course!"
+        }
       };
       setState(prev => ({ ...prev, isAnalyzing: false, analysisResult: finalResult }));
     } catch (error) {
@@ -309,11 +315,11 @@ const App: React.FC = () => {
       <div className="max-w-4xl mx-auto relative z-10">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold italic bg-gradient-to-r from-purple-400 to-purple-600 bg-clip-text text-transparent mb-3">
-            Content Marketing Assistant
+          <h1 className="text-4xl font-bold italic bg-gradient-to-r from-indigo-400 via-purple-500 to-pink-500 bg-clip-text text-transparent mb-3">
+            Course Sales Accelerator
           </h1>
           <p className="text-gray-400 text-sm">
-            Select a course and get AI-powered marketing content for Twitter, Email, Instagram, and TikTok.
+            Generate AI-powered marketing content and update your Whop course directly.
           </p>
         </div>
 
@@ -397,8 +403,12 @@ const App: React.FC = () => {
               <div className="mt-8">
                 <ResultCard
                   result={state.analysisResult}
-                  onUpdateWhop={handleUpdateOnWhop}
-                  isUpdating={state.isUpdatingWhop}
+                  courseId={state.selectedProduct?.id}
+                  companyId={state.companyId || undefined}
+                  onWhopAction={(type, success, message) => {
+                    setState(prev => ({ ...prev, updateMessage: message }));
+                    setTimeout(() => setState(prev => ({ ...prev, updateMessage: null })), 5000);
+                  }}
                 />
               </div>
             )}

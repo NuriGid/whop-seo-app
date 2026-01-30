@@ -54,11 +54,11 @@ export default async function handler(req: any, res: any) {
         messages: [
           {
             role: "system",
-            content: `You are a marketing content generator. Generate content in plain text format.
+            content: `You are a marketing content generator for online courses. Generate content in plain text format.
             
 IMPORTANT: Separate each section with exactly: ${DELIMITER}
 
-Format your response EXACTLY like this:
+Format your response EXACTLY like this (6 sections total):
 [Twitter content here - 3-5 tweet thread]
 ${DELIMITER}
 [Email content here - professional sales email]
@@ -66,6 +66,10 @@ ${DELIMITER}
 [Instagram caption here with hashtags]
 ${DELIMITER}
 [TikTok script here - engaging video script]
+${DELIMITER}
+[Whop Course Description - SEO-optimized, compelling sales description for the course landing page, 2-3 paragraphs]
+${DELIMITER}
+[Announcement Title]|||[Announcement Body - exciting community announcement about this course, 1-2 paragraphs]
 
 Do NOT use JSON. Do NOT use markdown code blocks. Just plain text with the delimiter between sections.`
           },
@@ -75,11 +79,11 @@ Do NOT use JSON. Do NOT use markdown code blocks. Just plain text with the delim
             
 ${prompt}
 
-Remember: Use ${DELIMITER} between each section (Twitter, Email, Instagram, TikTok).`
+Remember: Use ${DELIMITER} between each section (Twitter, Email, Instagram, TikTok, Whop Description, Announcement).`
           }
         ],
         temperature: 0.7,
-        max_tokens: 2000
+        max_tokens: 3000
       })
     });
 
@@ -101,6 +105,13 @@ Remember: Use ${DELIMITER} between each section (Twitter, Email, Instagram, TikT
     const email = parts[1] || "İçerik oluşturulamadı. Lütfen tekrar deneyin.";
     const instagram = parts[2] || "İçerik oluşturulamadı. Lütfen tekrar deneyin.";
     const tiktok = parts[3] || "İçerik oluşturulamadı. Lütfen tekrar deneyin.";
+    const whopDescription = parts[4] || email;  // Fallback to email if missing
+
+    // Parse announcement (format: Title|||Body)
+    const announcementRaw = parts[5] || "";
+    const announcementParts = announcementRaw.split('|||');
+    const announcementTitle = announcementParts[0]?.trim() || "🚀 New Course Available!";
+    const announcementBody = announcementParts[1]?.trim() || email;
 
     console.log(`✅ Parsed ${parts.length} sections`);
 
@@ -112,7 +123,11 @@ Remember: Use ${DELIMITER} between each section (Twitter, Email, Instagram, TikT
       twitterThread: twitter,
       salesEmail: email,
       instagramPost: instagram,
-      tiktokScript: tiktok
+      tiktokScript: tiktok,
+      // Whop-specific content
+      whopSalesDescription: whopDescription,
+      announcementTitle,
+      announcementBody
     });
 
   } catch (error: any) {
