@@ -32,6 +32,10 @@ interface AppState {
   isAnalyzing: boolean;
   analysisError: string | null;
   isDropdownOpen: boolean;
+
+  // Update on Whop
+  isUpdatingWhop: boolean;
+  updateMessage: string | null;
 }
 
 // Icons
@@ -72,6 +76,8 @@ const App: React.FC = () => {
     isAnalyzing: false,
     analysisError: null,
     isDropdownOpen: false,
+    isUpdatingWhop: false,
+    updateMessage: null,
   });
 
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -233,6 +239,54 @@ const App: React.FC = () => {
     }
   }, [state.selectedProduct, state.courseDescription, state.userToken, state.companyId]);
 
+  const handleUpdateOnWhop = useCallback(async (content: string, contentType: string) => {
+    if (!state.selectedProduct) return;
+
+    setState(prev => ({ ...prev, isUpdatingWhop: true, updateMessage: null }));
+
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (state.userToken) {
+        headers['Authorization'] = `Bearer ${state.userToken}`;
+      }
+      if (state.companyId) headers['X-Whop-Company-Id'] = state.companyId;
+
+      const response = await fetch('/api/update', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          productId: state.selectedProduct.id,
+          newDescription: content
+        })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || `Update failed (${response.status})`);
+      }
+
+      setState(prev => ({
+        ...prev,
+        isUpdatingWhop: false,
+        updateMessage: `✅ Product description updated on Whop! (${contentType})`
+      }));
+
+      // Clear success message after 5 seconds
+      setTimeout(() => {
+        setState(prev => ({ ...prev, updateMessage: null }));
+      }, 5000);
+
+    } catch (error) {
+      console.error('❌ Update Error:', error);
+      setState(prev => ({
+        ...prev,
+        isUpdatingWhop: false,
+        updateMessage: `❌ Failed to update: ${error instanceof Error ? error.message : 'Unknown error'}`
+      }));
+    }
+  }, [state.selectedProduct, state.userToken, state.companyId]);
+
 
   if (state.isLoading) {
     return (
@@ -334,7 +388,20 @@ const App: React.FC = () => {
 
             {state.isAnalyzing && <div className="flex justify-center my-8"><Loader /></div>}
             {state.analysisError && <div className="bg-red-900/50 border border-red-700 rounded-xl p-4 my-6 text-red-300">Error: {state.analysisError}</div>}
-            {state.analysisResult && <div className="mt-8"><ResultCard result={state.analysisResult} /></div>}
+            {state.updateMessage && (
+              <div className={`${state.updateMessage.startsWith('✅') ? 'bg-green-900/50 border-green-700 text-green-300' : 'bg-red-900/50 border-red-700 text-red-300'} border rounded-xl p-4 my-6`}>
+                {state.updateMessage}
+              </div>
+            )}
+            {state.analysisResult && (
+              <div className="mt-8">
+                <ResultCard
+                  result={state.analysisResult}
+                  onUpdateWhop={handleUpdateOnWhop}
+                  isUpdating={state.isUpdatingWhop}
+                />
+              </div>
+            )}
           </div>
         )}
 
