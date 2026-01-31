@@ -143,7 +143,7 @@ IMPORTANT: Use [1], [2], [3], [4], [5], [6] markers exactly as shown.`;
       }
     }
 
-    // Clean content helper
+    // Clean content helper - AGGRESSIVE label removal
     function cleanContent(text: string): string {
       if (!text) return "";
 
@@ -156,9 +156,33 @@ IMPORTANT: Use [1], [2], [3], [4], [5], [6] markers exactly as shown.`;
         .replace(/^(COMMUNITY\s*)?ANNOUNCEMENT:?\s*/gi, '')
         .replace(/^TIKTOK\s*(SCRIPT)?:?\s*/gi, '')
         .replace(/^INSTAGRAM\s*(CAPTION)?:?\s*/gi, '')
+        // Remove tweet numbering headers like "5/5 TWITTER THREAD:"
+        .replace(/^\d+\/\d+\s*(TWITTER|X)?\s*(THREAD)?:?\s*/gim, '')
+        // Remove common garbage labels
+        .replace(/^Hook:?\s*/gim, '')
+        .replace(/^CTA:?\s*/gim, '')
+        .replace(/^Call\s*to\s*Action:?\s*/gim, '')
+        .replace(/^Intro(duction)?:?\s*/gim, '')
+        .replace(/^Body:?\s*/gim, '')
+        .replace(/^Conclusion:?\s*/gim, '')
+        .replace(/^Opening:?\s*/gim, '')
+        .replace(/^Closing:?\s*/gim, '')
+        .replace(/^Main\s*(Content|Point|Body)?:?\s*/gim, '')
+        .replace(/^Tweet\s*\d+:?\s*/gim, '')
+        .replace(/^Post:?\s*/gim, '')
+        .replace(/^Caption:?\s*/gim, '')
+        .replace(/^Script:?\s*/gim, '')
+        .replace(/^Video\s*Script:?\s*/gim, '')
         // Remove email headers
         .replace(/^Subject:.*$/gim, '')
         .replace(/^Dear\s*\[?[^\]]*\]?,?\s*/gim, '')
+        .replace(/^To:.*$/gim, '')
+        .replace(/^From:.*$/gim, '')
+        .replace(/^Hi\s+\w+,?\s*/gim, '')
+        .replace(/^Hello\s+\w+,?\s*/gim, '')
+        // Remove markdown formatting
+        .replace(/^#+\s*/gm, '')
+        .replace(/\*\*/g, '')
         // Clean whitespace
         .replace(/^\n+/, '')
         .trim();
