@@ -320,11 +320,11 @@ const App: React.FC = () => {
       <div className="max-w-4xl mx-auto relative z-10">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold italic bg-gradient-to-r from-indigo-400 via-purple-500 to-pink-500 bg-clip-text text-transparent mb-3">
-            Course Sales Accelerator
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-indigo-400 via-purple-500 to-pink-500 bg-clip-text text-transparent mb-3">
+            🚀 CourseRocket
           </h1>
           <p className="text-gray-400 text-sm">
-            Generate AI-powered marketing content and update your Whop course directly.
+            AI-powered marketing content for Whop course creators.
           </p>
         </div>
 

@@ -81,9 +81,11 @@ CONTENT RULES:
    - Fast-paced, engaging content
    - Clear CTA at end
 
-6. INSTAGRAM CAPTION:
-   - 2-3 sentences with emojis
-   - Relevant hashtags
+6. INSTAGRAM CAPTION (REQUIRED - Do not skip):
+   - Start with an attention-grabbing emoji
+   - 2-3 engaging sentences about the course
+   - Include a call-to-action
+   - End with 5-8 relevant hashtags (e.g. #OnlineCourse #Learning #Education)
 
 CRITICAL: Raw content only. Separate with ${SEP}. No headers.`;
 
