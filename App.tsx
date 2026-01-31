@@ -213,7 +213,7 @@ const App: React.FC = () => {
   }, []);
 
   const handleAnalyze = useCallback(async () => {
-    if (!state.selectedProduct || !state.courseDescription.trim()) return;
+    if (!state.selectedProduct) return;
     setState(prev => ({ ...prev, isAnalyzing: true, analysisError: null }));
     try {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -222,7 +222,12 @@ const App: React.FC = () => {
       }
       if (state.companyId) headers['X-Whop-Company-Id'] = state.companyId;
 
-      const response = await fetch('/api/analyze', { method: 'POST', headers, body: JSON.stringify({ prompt: state.courseDescription }) });
+      // Use course name and existing description from the product
+      const courseName = state.selectedProduct.name || state.selectedProduct.title || 'Course';
+      const courseDesc = state.selectedProduct.description || '';
+      const prompt = `Course: ${courseName}\n\n${courseDesc}`;
+
+      const response = await fetch('/api/analyze', { method: 'POST', headers, body: JSON.stringify({ prompt }) });
       if (!response.ok) throw new Error(`Analysis Failed (${response.status})`);
       const result = await response.json();
 
@@ -232,9 +237,9 @@ const App: React.FC = () => {
         instagramPost: result.instagramPost || result.instagram || "No content generated.",
         tiktokScript: result.tiktokScript || result.tiktok || "No content generated.",
         // Whop-specific content
-        whopSalesDescription: result.whopSalesDescription || result.salesDescription || result.courseDescription || state.courseDescription,
+        whopSalesDescription: result.whopSalesDescription || result.salesDescription || result.courseDescription || courseDesc,
         whopAnnouncement: {
-          title: result.announcementTitle || result.whopAnnouncement?.title || `🚀 ${state.selectedProduct?.name || state.selectedProduct?.title} is NOW LIVE!`,
+          title: result.announcementTitle || result.whopAnnouncement?.title || `🚀 ${courseName} is NOW LIVE!`,
           body: result.announcementBody || result.whopAnnouncement?.body || result.salesEmail || "Check out our latest course!"
         }
       };
@@ -243,7 +248,7 @@ const App: React.FC = () => {
       console.error('❌ Analysis Error:', error);
       setState(prev => ({ ...prev, isAnalyzing: false, analysisError: error instanceof Error ? error.message : 'Analysis failed' }));
     }
-  }, [state.selectedProduct, state.courseDescription, state.userToken, state.companyId]);
+  }, [state.selectedProduct, state.userToken, state.companyId]);
 
   const handleUpdateOnWhop = useCallback(async (content: string, contentType: string) => {
     if (!state.selectedProduct) return;
@@ -374,20 +379,34 @@ const App: React.FC = () => {
             </div>
 
             {state.selectedProduct && (
-              <div className="relative z-0 bg-gray-800/40 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-6">
-                <label className="block text-center text-gray-300 font-medium mb-4">Course Description</label>
-                <textarea
-                  className="w-full bg-gray-900 border border-gray-600 text-gray-200 rounded-xl p-4 min-h-[200px] resize-y focus:ring-2 focus:ring-purple-500 leading-relaxed"
-                  value={state.courseDescription}
-                  onChange={handleDescriptionChange}
-                  placeholder="Enter course description..."
-                />
+              <div className="relative z-0 bg-gray-800/40 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-6 text-center">
+                {/* Selected Course Badge */}
+                <div className="flex flex-wrap justify-center gap-2 mb-6">
+                  <span className="inline-flex items-center gap-2 bg-indigo-600/30 border border-indigo-500/50 text-indigo-300 px-4 py-2 rounded-full text-sm font-medium">
+                    <BookIcon className="w-4 h-4" />
+                    {state.selectedProduct.name || state.selectedProduct.title}
+                  </span>
+                </div>
+
+                {/* Generate Button - Primary CTA */}
                 <button
                   onClick={handleAnalyze}
-                  disabled={state.isAnalyzing || !state.courseDescription.trim()}
-                  className="w-full mt-6 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 disabled:opacity-50 text-white font-semibold py-4 px-6 rounded-xl transition-all shadow-lg"
+                  disabled={state.isAnalyzing}
+                  className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:opacity-50 text-white font-bold py-4 px-8 rounded-xl transition-all shadow-lg transform hover:scale-[1.02] active:scale-[0.98]"
                 >
-                  {state.isAnalyzing ? 'Generating...' : 'Generate Marketing Content'}
+                  {state.isAnalyzing ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="animate-spin w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Generating Content...
+                    </span>
+                  ) : (
+                    <span className="flex items-center justify-center gap-2">
+                      ✨ Generate Marketing Content
+                    </span>
+                  )}
                 </button>
               </div>
             )}
