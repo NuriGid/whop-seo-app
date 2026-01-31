@@ -1,5 +1,5 @@
 /**
- * Marketing Content Generator API
+ * Marketing Content Generator API - CourseRocket
  * 
  * Uses Groq AI to generate HIGH-CONVERTING marketing content.
  * Direct-Response Copywriting style with comprehensive cleanup.
@@ -45,49 +45,53 @@ export default async function handler(req: any, res: any) {
 
     console.log(`⚡️ Groq Request: llama-3.1-8b-instant`);
 
-    // DIRECT-RESPONSE COPYWRITING PROMPT
+    // DIRECT-RESPONSE COPYWRITING PROMPT - Ultra strict format
     const systemMessage = `You are a world-class Direct-Response Copywriter. Your job is to SELL courses.
 
-OUTPUT: Exactly 6 raw text blocks separated by '${SEP}'. NO labels, NO headers, NO 'Part X'.
+CRITICAL FORMAT RULES:
+- Output EXACTLY 6 text blocks
+- Separate each block with EXACTLY: ${SEP}
+- NO headers, NO labels, NO "Part 1:", NO section titles
+- Start each block DIRECTLY with the content
 
-CONTENT RULES:
+CONTENT ORDER (separated by ${SEP}):
 
-1. X (TWITTER) THREAD - Must be exactly 4-5 tweets (flood format):
-   - Use 1/5, 2/5, 3/5, 4/5, 5/5 numbering
-   - First tweet = powerful hook
-   - Last tweet = call-to-action with course link placeholder
-   - Include relevant hashtags
+BLOCK 1 - X/TWITTER THREAD:
+4-5 tweets in flood format with 1/5, 2/5, 3/5, 4/5, 5/5 numbering
+Include hashtags. First tweet = powerful hook.
 
-2. SALES EMAIL (NO numbering like 1/5, NO Subject line, NO Dear):
-   - Direct, persuasive sales pitch
-   - Start with a compelling hook
-   - Focus on transformation and benefits
-   - End with call-to-action
+${SEP}
 
-3. COURSE DESCRIPTION (HIGH-CONVERTING LANDING PAGE):
-   - Start with a POWERFUL HOOK that grabs attention
-   - List 3-5 bullet points of KEY BENEFITS (use ✅ or • symbols)
-   - Include "What You'll Learn" or "What You Get" section
-   - End with a STRONG call-to-action
-   - DO NOT write like an academic syllabus
+BLOCK 2 - SALES EMAIL:
+Professional, persuasive sales email. NO "Subject:" line. NO "Dear". 
+Start directly with a compelling hook. End with CTA.
 
-4. COMMUNITY ANNOUNCEMENT (hype-driven):
-   - First line = exciting title with emoji
-   - Body = enthusiastic, FOMO-inducing message
-   - Keep it concise and punchy
+${SEP}
 
-5. TIKTOK SCRIPT:
-   - Hook in first 3 seconds
-   - Fast-paced, engaging content
-   - Clear CTA at end
+BLOCK 3 - COURSE DESCRIPTION:
+High-converting landing page style. Include:
+- Powerful hook
+- Bullet points with benefits (use ✅)
+- "What You'll Learn" section
+- Strong CTA
 
-6. INSTAGRAM CAPTION (REQUIRED - Do not skip):
-   - Start with an attention-grabbing emoji
-   - 2-3 engaging sentences about the course
-   - Include a call-to-action
-   - End with 5-8 relevant hashtags (e.g. #OnlineCourse #Learning #Education)
+${SEP}
 
-CRITICAL: Raw content only. Separate with ${SEP}. No headers.`;
+BLOCK 4 - COMMUNITY ANNOUNCEMENT:
+First line = exciting title with emoji
+Body = enthusiastic, FOMO-inducing message
+
+${SEP}
+
+BLOCK 5 - TIKTOK SCRIPT:
+30-60 second video script. Hook in first 3 seconds. CTA at end.
+
+${SEP}
+
+BLOCK 6 - INSTAGRAM CAPTION:
+Start with emoji. 2-3 engaging sentences. CTA. End with 5-8 hashtags.
+
+REMEMBER: Separate with ${SEP}. Raw content only.`;
 
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -99,10 +103,10 @@ CRITICAL: Raw content only. Separate with ${SEP}. No headers.`;
         model: 'llama-3.1-8b-instant',
         messages: [
           { role: "system", content: systemMessage },
-          { role: "user", content: `Generate high-converting marketing content for this course:\n\n${prompt}\n\nRemember: 6 raw blocks separated by ${SEP}. Landing page style for course description. No academic tone.` }
+          { role: "user", content: `Create marketing content for: ${prompt}` }
         ],
-        temperature: 0.2,  // Slightly higher for more creative sales copy
-        max_tokens: 3500
+        temperature: 0.3,
+        max_tokens: 4000
       })
     });
 
@@ -115,17 +119,54 @@ CRITICAL: Raw content only. Separate with ${SEP}. No headers.`;
     const rawContent = data.choices?.[0]?.message?.content || "";
 
     console.log("📝 Raw Response Length:", rawContent.length);
+    console.log("📝 Raw Content Preview:", rawContent.substring(0, 500));
 
-    // Split by separator
-    const parts = rawContent.split(SEP);
+    // ROBUST PARSING: Try multiple separator patterns
+    let parts: string[] = [];
 
-    // DEEP CLEAN: Remove ALL unwanted formatting
+    // Try main separator first
+    if (rawContent.includes(SEP)) {
+      parts = rawContent.split(SEP);
+    }
+    // Fallback: Try variations
+    else if (rawContent.includes('###NEXT PART###')) {
+      parts = rawContent.split('###NEXT PART###');
+    }
+    else if (rawContent.includes('---')) {
+      parts = rawContent.split(/\n---+\n/);
+    }
+    else if (rawContent.includes('BLOCK')) {
+      // Parse by BLOCK labels
+      parts = rawContent.split(/BLOCK\s*\d+[:\-\s]*/i).filter(p => p.trim());
+    }
+    else {
+      // Last resort: Split by double newlines and group
+      console.warn("⚠️ No separator found, using fallback parsing");
+      const lines = rawContent.split('\n\n');
+      // Take first section as twitter, estimate others
+      parts = [
+        lines.slice(0, 5).join('\n\n'),  // Twitter
+        lines.slice(5, 8).join('\n\n'),   // Email
+        lines.slice(8, 12).join('\n\n'),  // Description
+        lines.slice(12, 14).join('\n\n'), // Announcement
+        lines.slice(14, 17).join('\n\n'), // TikTok
+        lines.slice(17).join('\n\n')      // Instagram
+      ];
+    }
+
+    console.log(`📊 Parsed ${parts.length} parts`);
+
+    // DEEP CLEAN function
     const cleanContent = (text: string, removeNumbering: boolean = false): string => {
+      if (!text) return "";
+
       let cleaned = text
-        // Remove part labels
+        // Remove part/block labels
         .replace(/^(Part\s*\d+\s*:?\s*)/gi, '')
+        .replace(/^(Block\s*\d+\s*:?\s*)/gi, '')
         .replace(/^###.*?###\s*/gi, '')
         // Remove section headers
+        .replace(/^(X\s*\/?\s*Twitter\s*(Thread)?:?\s*)/gi, '')
         .replace(/^(Twitter\s*(Thread)?:?\s*)/gi, '')
         .replace(/^(Email\s*(Content)?:?\s*)/gi, '')
         .replace(/^(Sales\s*Email:?\s*)/gi, '')
@@ -136,65 +177,69 @@ CRITICAL: Raw content only. Separate with ${SEP}. No headers.`;
         .replace(/^(Community\s*Announcement:?\s*)/gi, '')
         .replace(/^(TikTok\s*(Script)?:?\s*)/gi, '')
         .replace(/^(Instagram\s*(Caption|Post)?:?\s*)/gi, '')
-        .replace(/^(Introduction:?\s*)/gi, '')
-        .replace(/^(Content:?\s*)/gi, '')
         // Remove EMAIL-specific formatting
         .replace(/^Subject:.*$/gim, '')
         .replace(/^Dear\s*\[?[^\]]*\]?,?\s*/gim, '')
-        .replace(/^Dear\s+\w+,?\s*/gim, '')
         .replace(/^To:.*$/gim, '')
         .replace(/^From:.*$/gim, '')
         .replace(/^Hi\s*\[?[^\]]*\]?,?\s*/gim, '')
         .replace(/^Hello\s*\[?[^\]]*\]?,?\s*/gim, '')
-        .replace(/^Hey\s*\[?[^\]]*\]?,?\s*/gim, '')
         // Remove markdown headers
         .replace(/^#+\s*/gm, '')
-        // Clean up extra newlines at start
+        // Clean up extra newlines
         .replace(/^\n+/, '')
         .trim();
 
-      // Remove thread numbering (1/5, 2/5, etc.) only for non-Twitter content
       if (removeNumbering) {
         cleaned = cleaned
-          .replace(/^\d+\/\d+\s*/gm, '')  // Remove 1/5 at start of lines
-          .replace(/\[\d+\/\d+\]\s*/g, '')  // Remove [1/5] anywhere
+          .replace(/^\d+\/\d+\s*/gm, '')
+          .replace(/\[\d+\/\d+\]\s*/g, '')
           .trim();
       }
 
       return cleaned;
     };
 
-    // Apply cleaning with specific rules per content type
-    const twitter = cleanContent(parts[0] || "", false);  // Twitter CAN have numbering
-    const email = cleanContent(parts[1] || "", true);     // Email: REMOVE numbering
-    const whopDescription = cleanContent(parts[2] || "", true);  // Description: REMOVE numbering
-    const announcement = cleanContent(parts[3] || "", true);
-    const tiktok = cleanContent(parts[4] || "", true);
-    const instagram = cleanContent(parts[5] || "", true);
+    // Apply cleaning - ensure we have at least 6 parts
+    while (parts.length < 6) {
+      parts.push("");
+    }
 
-    console.log(`📊 Parsed and cleaned ${parts.length} parts`);
+    const twitter = cleanContent(parts[0], false);
+    const email = cleanContent(parts[1], true);
+    const whopDescription = cleanContent(parts[2], true);
+    const announcement = cleanContent(parts[3], true);
+    const tiktok = cleanContent(parts[4], true);
+    const instagram = cleanContent(parts[5], true);
+
+    // Log for debugging
+    console.log(`✅ Twitter: ${twitter.substring(0, 50)}...`);
+    console.log(`✅ Email: ${email.substring(0, 50)}...`);
+    console.log(`✅ Description: ${whopDescription.substring(0, 50)}...`);
+    console.log(`✅ Announcement: ${announcement.substring(0, 50)}...`);
+    console.log(`✅ TikTok: ${tiktok.substring(0, 50)}...`);
+    console.log(`✅ Instagram: ${instagram.substring(0, 50)}...`);
 
     // Parse announcement (first line = title, rest = body)
     const announcementLines = announcement.split('\n').filter((l: string) => l.trim());
     const announcementTitle = announcementLines[0] || "🚀 New Course Available!";
     const announcementBody = announcementLines.slice(1).join('\n').trim() || announcement;
 
-    console.log(`✅ Content generated and cleaned successfully`);
-
     return res.status(200).json({
       // Legacy fields
-      twitter,
-      email,
-      instagram,
-      tiktok,
-      twitterThread: twitter,
-      salesEmail: email,
-      instagramPost: instagram,
-      tiktokScript: tiktok,
-      // Whop-specific (100% CLEAN, LANDING PAGE STYLE)
-      whopSalesDescription: whopDescription,
+      twitter: twitter || "Content generation in progress...",
+      email: email || "Content generation in progress...",
+      instagram: instagram || "Content generation in progress...",
+      tiktok: tiktok || "Content generation in progress...",
+      // Mapped fields
+      twitterThread: twitter || "Content generation in progress...",
+      salesEmail: email || "Content generation in progress...",
+      instagramPost: instagram || "Content generation in progress...",
+      tiktokScript: tiktok || "Content generation in progress...",
+      // Whop-specific
+      whopSalesDescription: whopDescription || "Content generation in progress...",
       announcementTitle,
-      announcementBody
+      announcementBody: announcementBody || "Check out our latest course!"
     });
 
   } catch (error: any) {
