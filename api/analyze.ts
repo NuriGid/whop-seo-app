@@ -1,17 +1,14 @@
 /**
- * CourseRocket - Marketing Content Engine
+ * CourseRocket - Marketing Content Engine v2.1
  * 
- * Production-grade AI content generator for Whop courses.
- * Uses Groq/Llama for high-converting marketing copy.
- * 
- * @version 2.0.0 - Final Production Build
+ * SIMPLE & RELIABLE parsing approach.
+ * Uses explicit section markers for bulletproof extraction.
  */
 
 const GROQ_API_KEY = (process.env.GROQ_API_KEY || '').trim();
-const SEP = '###NEXT_PART###';
 
 export default async function handler(req: any, res: any) {
-  // CORS - Production headers
+  // CORS
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
@@ -19,9 +16,8 @@ export default async function handler(req: any, res: any) {
 
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  // Error helper
   const returnError = (msg: string) => {
-    console.error(`❌ CourseRocket Error: ${msg}`);
+    console.error(`❌ ${msg}`);
     return res.status(200).json({
       twitterThread: `⚠️ ${msg}`,
       salesEmail: `⚠️ ${msg}`,
@@ -33,42 +29,38 @@ export default async function handler(req: any, res: any) {
     });
   };
 
-  if (req.method !== 'POST') return returnError('POST method required.');
-
-  // Validate environment
-  if (!GROQ_API_KEY) {
-    return returnError('GROQ_API_KEY not configured. Check Vercel environment variables.');
-  }
-
-  // Validate request
-  if (!req.body?.prompt) {
-    return returnError('Missing course information.');
-  }
+  if (req.method !== 'POST') return returnError('POST only.');
+  if (!GROQ_API_KEY) return returnError('GROQ_API_KEY missing.');
+  if (!req.body?.prompt) return returnError('No prompt.');
 
   const { prompt } = req.body;
-  console.log(`🚀 CourseRocket generating content for: ${prompt.substring(0, 80)}...`);
+  console.log(`🚀 Generating for: ${prompt.substring(0, 60)}...`);
 
   try {
-    // PRODUCTION PROMPT - Direct Response Copywriting
-    const systemPrompt = `You are an elite Direct-Response Copywriter. Your job is to create marketing content that SELLS.
+    // SIMPLE PROMPT with clear markers
+    const systemPrompt = `You are an expert marketing copywriter. Generate content for an online course.
 
-OUTPUT FORMAT: Write exactly 6 content blocks. Separate each block with: ${SEP}
+Write exactly these 6 sections with EXACT markers:
 
-BLOCK ORDER:
-1. X/TWITTER THREAD (4-5 tweets numbered 1/, 2/, 3/, 4/, 5/ with hashtags)
-2. SALES EMAIL (persuasive email body - NO "Subject:" or "Dear")  
-3. WHOP LANDING PAGE (benefit-focused course description with bullet points)
-4. COMMUNITY ANNOUNCEMENT (exciting title + body for course launch)
-5. SHORT VIDEO SCRIPT (30-60 second hook + content + CTA)
-6. INSTAGRAM CAPTION (engaging post with emojis and hashtags)
+---TWITTER---
+Write a 4-5 tweet thread. Number each tweet 1/, 2/, 3/, 4/, 5/. Include hashtags.
 
-STRICT RULES:
-- Do NOT include labels like "Part 1:", "Twitter Thread:", "Email:", etc.
-- Start each block DIRECTLY with the content
-- Use ${SEP} between blocks
-- Write in English for international audience
-- Focus on benefits and transformation
-- Include strong calls-to-action`;
+---EMAIL---
+Write a sales email. Start with a hook. NO "Subject:" or "Dear". Just the email body.
+
+---DESCRIPTION---
+Write a course landing page description. Use bullet points for benefits. Include a call-to-action.
+
+---ANNOUNCEMENT---
+Write an exciting community announcement. First line is the title with emoji. Then the body.
+
+---TIKTOK---
+Write a 30-60 second video script. Hook viewer immediately. End with CTA.
+
+---INSTAGRAM---
+Write a caption with emojis and hashtags.
+
+IMPORTANT: Use the exact markers ---TWITTER---, ---EMAIL---, etc. to separate sections.`;
 
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -80,146 +72,94 @@ STRICT RULES:
         model: 'llama-3.1-8b-instant',
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: `Generate marketing content for: ${prompt}` }
+          { role: "user", content: `Course: ${prompt}` }
         ],
-        temperature: 0.2,  // Strict formatting
+        temperature: 0.3,
         max_tokens: 4000
       })
     });
 
     if (!response.ok) {
-      const err = await response.text();
-      return returnError(`AI API Error: ${err.substring(0, 100)}`);
+      return returnError(`API Error: ${response.status}`);
     }
 
     const data = await response.json();
-    const rawContent = data.choices?.[0]?.message?.content || "";
+    const raw = data.choices?.[0]?.message?.content || "";
+    console.log(`📝 Response: ${raw.length} chars`);
 
-    console.log(`📝 Raw response: ${rawContent.length} chars`);
+    // EXTRACT sections by markers
+    const extract = (content: string, startMarker: string, endMarkers: string[]): string => {
+      const startIdx = content.indexOf(startMarker);
+      if (startIdx === -1) return "";
 
-    // PARSE - Split by separator
-    let parts = rawContent.split(SEP);
-
-    // Fallback: Try numbered patterns if separator fails
-    if (parts.length < 6) {
-      console.log('⚠️ Separator not found, trying pattern matching...');
-      const patterns = [
-        /\[?1\]?[\.\)\:]?\s*(X\/)?TWITTER/i,
-        /\[?2\]?[\.\)\:]?\s*SALES?\s*EMAIL/i,
-        /\[?3\]?[\.\)\:]?\s*(WHOP|COURSE|LANDING)/i,
-        /\[?4\]?[\.\)\:]?\s*(COMMUNITY|ANNOUNC)/i,
-        /\[?5\]?[\.\)\:]?\s*(VIDEO|TIKTOK|SHORT)/i,
-        /\[?6\]?[\.\)\:]?\s*INSTAGRAM/i
-      ];
-
-      let lastIndex = 0;
-      parts = [];
-
-      for (let i = 0; i < patterns.length; i++) {
-        const regex = new RegExp(patterns[i].source, 'gi');
-        const match = regex.exec(rawContent.substring(lastIndex));
-        if (match) {
-          const start = lastIndex + match.index;
-          if (i > 0) {
-            parts.push(rawContent.substring(lastIndex, start));
-          }
-          lastIndex = start;
+      let endIdx = content.length;
+      for (const endMarker of endMarkers) {
+        const idx = content.indexOf(endMarker, startIdx + startMarker.length);
+        if (idx !== -1 && idx < endIdx) {
+          endIdx = idx;
         }
       }
-      parts.push(rawContent.substring(lastIndex));
-    }
 
-    // Ensure 6 parts
-    while (parts.length < 6) parts.push("");
+      return content.substring(startIdx + startMarker.length, endIdx).trim();
+    };
 
-    // AGGRESSIVE CONTENT CLEANER
-    const clean = (text: string, keepNumbering: boolean = false): string => {
+    const allMarkers = ['---TWITTER---', '---EMAIL---', '---DESCRIPTION---', '---ANNOUNCEMENT---', '---TIKTOK---', '---INSTAGRAM---'];
+
+    let twitter = extract(raw, '---TWITTER---', allMarkers.filter(m => m !== '---TWITTER---'));
+    let email = extract(raw, '---EMAIL---', allMarkers.filter(m => m !== '---EMAIL---'));
+    let description = extract(raw, '---DESCRIPTION---', allMarkers.filter(m => m !== '---DESCRIPTION---'));
+    let announcement = extract(raw, '---ANNOUNCEMENT---', allMarkers.filter(m => m !== '---ANNOUNCEMENT---'));
+    let tiktok = extract(raw, '---TIKTOK---', allMarkers.filter(m => m !== '---TIKTOK---'));
+    let instagram = extract(raw, '---INSTAGRAM---', allMarkers.filter(m => m !== '---INSTAGRAM---'));
+
+    // Clean garbage labels
+    const clean = (text: string): string => {
       if (!text) return "";
-
-      let cleaned = text
-        // Remove block markers
-        .replace(/^\[\d+\]\s*/gi, '')
-        .replace(/^(BLOCK\s*)?\d+[\.\)\:]\s*/gi, '')
-        // Remove section headers
-        .replace(/^(X\/)?(TWITTER|X)\s*(THREAD)?[\:\-]?\s*/gi, '')
-        .replace(/^SALES?\s*EMAIL[\:\-]?\s*/gi, '')
-        .replace(/^(WHOP\s*)?(COURSE\s*)?(LANDING\s*)?(PAGE\s*)?DESCRIPTION[\:\-]?\s*/gi, '')
-        .replace(/^(COMMUNITY\s*)?ANNOUNCEMENT[\:\-]?\s*/gi, '')
-        .replace(/^(SHORT\s*)?(VIDEO\s*)?SCRIPT[\:\-]?\s*/gi, '')
-        .replace(/^(TIKTOK\s*)(SCRIPT)?[\:\-]?\s*/gi, '')
-        .replace(/^INSTAGRAM\s*(CAPTION|POST)?[\:\-]?\s*/gi, '')
-        // Remove garbage labels
-        .replace(/^Hook[\:\-]?\s*/gim, '')
-        .replace(/^CTA[\:\-]?\s*/gim, '')
-        .replace(/^(Call\s*to\s*Action)[\:\-]?\s*/gim, '')
-        .replace(/^(Intro(duction)?|Body|Conclusion|Opening|Closing)[\:\-]?\s*/gim, '')
-        .replace(/^Tweet\s*\d+[\:\-]?\s*/gim, '')
-        .replace(/^(Part|Section)\s*\d+[\:\-]?\s*/gim, '')
-        .replace(/^Main\s*(Content|Point)?[\:\-]?\s*/gim, '')
-        .replace(/^Caption[\:\-]?\s*/gim, '')
-        .replace(/^Post[\:\-]?\s*/gim, '')
-        // Remove email headers
-        .replace(/^Subject[\:\-]?\s*.+$/gim, '')
-        .replace(/^Dear\s*\[?[^\]\n]*\]?,?\s*/gim, '')
-        .replace(/^(To|From)[\:\-]?\s*.+$/gim, '')
-        .replace(/^(Hi|Hello|Hey)\s+\w+,?\s*/gim, '')
-        // Remove markdown
+      return text
+        .replace(/^\[?(INTRO|OUTRO)\s*(MUSIC|HOOK)?\]?.*$/gim, '')
+        .replace(/^\[.*?\]\s*/gm, '')
+        .replace(/^(Hook|CTA|Intro|Body|Conclusion):\s*/gim, '')
+        .replace(/^(Caption|Post|Script):\s*/gim, '')
+        .replace(/^Subject:.*$/gim, '')
+        .replace(/^Dear\s*\w*,?\s*/gim, '')
         .replace(/^#+\s*/gm, '')
         .replace(/\*\*/g, '')
-        // Clean whitespace
         .replace(/^\n+/, '')
         .trim();
-
-      // Remove numbering for non-Twitter content
-      if (!keepNumbering) {
-        cleaned = cleaned
-          .replace(/^\d+\/\d+\s*(TWITTER|X)?\s*(THREAD)?[\:\-]?\s*/gim, '')
-          .replace(/^\d+\/\d+\s+/gm, '');
-      }
-
-      return cleaned;
     };
 
-    // Apply cleaning
-    const twitter = clean(parts[0], true);  // Keep 1/5, 2/5 for Twitter
-    const email = clean(parts[1]);
-    const description = clean(parts[2]);
-    const announcement = clean(parts[3]);
-    const tiktok = clean(parts[4]);
-    const instagram = clean(parts[5]);
+    twitter = clean(twitter);
+    email = clean(email);
+    description = clean(description);
+    announcement = clean(announcement);
+    tiktok = clean(tiktok);
+    instagram = clean(instagram);
 
-    // Parse announcement (first line = title)
-    const announcementLines = announcement.split('\n').filter(l => l.trim());
-    const announcementTitle = announcementLines[0] || "🚀 New Course Available!";
-    const announcementBody = announcementLines.slice(1).join('\n').trim() || announcement;
+    // Parse announcement title
+    const annLines = announcement.split('\n').filter(l => l.trim());
+    const announcementTitle = annLines[0] || "🚀 New Course!";
+    const announcementBody = annLines.slice(1).join('\n').trim() || announcement;
 
-    // Log results
-    console.log(`✅ Content parsed - T:${twitter.length} E:${email.length} D:${description.length} A:${announcement.length} TK:${tiktok.length} I:${instagram.length}`);
+    console.log(`✅ T:${twitter.length} E:${email.length} D:${description.length} A:${announcement.length} TK:${tiktok.length} I:${instagram.length}`);
 
-    // Return with validation
-    const validate = (content: string, name: string): string => {
-      if (content && content.length > 20) return content;
-      return `[${name} - Please regenerate]`;
-    };
+    // Return with fallbacks
+    const fb = (t: string, n: string) => t && t.length > 20 ? t : `[${n} - Try regenerating]`;
 
     return res.status(200).json({
-      // Primary fields
-      twitterThread: validate(twitter, "Twitter"),
-      salesEmail: validate(email, "Email"),
-      whopSalesDescription: validate(description, "Description"),
+      twitterThread: fb(twitter, "Twitter"),
+      salesEmail: fb(email, "Email"),
+      whopSalesDescription: fb(description, "Description"),
       announcementTitle,
-      announcementBody: announcementBody || "Check out our latest course!",
-      tiktokScript: validate(tiktok, "TikTok"),
-      instagramPost: validate(instagram, "Instagram"),
-      // Legacy aliases
-      twitter: validate(twitter, "Twitter"),
-      email: validate(email, "Email"),
-      instagram: validate(instagram, "Instagram"),
-      tiktok: validate(tiktok, "TikTok")
+      announcementBody: announcementBody || "Check out our latest!",
+      tiktokScript: fb(tiktok, "TikTok"),
+      instagramPost: fb(instagram, "Instagram"),
+      twitter: fb(twitter, "Twitter"),
+      email: fb(email, "Email"),
+      instagram: fb(instagram, "Instagram"),
+      tiktok: fb(tiktok, "TikTok")
     });
 
   } catch (error: any) {
-    console.error('❌ CourseRocket Exception:', error);
-    return returnError(`Server error: ${error.message}`);
+    return returnError(`Error: ${error.message}`);
   }
 }
