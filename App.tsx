@@ -200,8 +200,8 @@ const App: React.FC = () => {
 
   // Handlers
   const handleSelectProduct = useCallback((product: WhopProduct | null) => {
-    const description = product ? buildDescriptionTemplate(product.name || product.title || 'Unknown') : '';
-    setState(prev => ({ ...prev, selectedProduct: product, courseDescription: description, analysisResult: null, analysisError: null, isDropdownOpen: false }));
+    // Reset description/notes to empty so user sees placeholder. No more template text.
+    setState(prev => ({ ...prev, selectedProduct: product, courseDescription: '', analysisResult: null, analysisError: null, isDropdownOpen: false }));
   }, []);
 
   const toggleDropdown = useCallback(() => {
