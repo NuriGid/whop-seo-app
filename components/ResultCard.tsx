@@ -61,6 +61,7 @@ const LoadingSpinner: React.FC<{ className?: string }> = ({ className }) => (
 const ResultCard: React.FC<ResultCardProps> = ({ result, courseId, companyId, onWhopAction }) => {
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
+  const [successAction, setSuccessAction] = useState<string | null>(null);
 
   const handleCopy = async (text: string, section: string) => {
     try {
@@ -97,7 +98,9 @@ const ResultCard: React.FC<ResultCardProps> = ({ result, courseId, companyId, on
       const data = await response.json();
 
       if (data.success) {
+        setSuccessAction('update');
         onWhopAction?.('update', true, '✅ Course description updated on Whop!');
+        setTimeout(() => setSuccessAction(null), 3000);
       } else {
         onWhopAction?.('update', false, `❌ Failed: ${data.error}`);
       }
@@ -126,7 +129,9 @@ const ResultCard: React.FC<ResultCardProps> = ({ result, courseId, companyId, on
       const data = await response.json();
 
       if (data.success) {
+        setSuccessAction('announce');
         onWhopAction?.('announce', true, '✅ Announcement published on Whop!');
+        setTimeout(() => setSuccessAction(null), 3000);
       } else {
         onWhopAction?.('announce', false, `❌ Failed: ${data.error}`);
       }
@@ -165,11 +170,16 @@ const ResultCard: React.FC<ResultCardProps> = ({ result, courseId, companyId, on
               </button>
               <button
                 onClick={handleUpdateOnWhop}
-                disabled={loadingAction === 'update' || !courseId}
-                className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold px-4 py-2 rounded-lg transition-all shadow-lg"
+                disabled={loadingAction === 'update' || !courseId || successAction === 'update'}
+                className={`flex items-center gap-2 font-semibold px-4 py-2 rounded-lg transition-all shadow-lg ${successAction === 'update'
+                  ? 'bg-green-600 text-white cursor-default'
+                  : 'bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white'
+                  }`}
               >
                 {loadingAction === 'update' ? (
                   <><LoadingSpinner className="w-4 h-4" /> Updating...</>
+                ) : successAction === 'update' ? (
+                  <><CheckIcon className="w-4 h-4" /> Updated! ✅</>
                 ) : (
                   <>⚡ UPDATE ON WHOP</>
                 )}
@@ -197,11 +207,16 @@ const ResultCard: React.FC<ResultCardProps> = ({ result, courseId, companyId, on
               </button>
               <button
                 onClick={handlePublishAnnouncement}
-                disabled={loadingAction === 'announce'}
-                className="flex items-center gap-2 bg-orange-600 hover:bg-orange-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold px-4 py-2 rounded-lg transition-all shadow-lg"
+                disabled={loadingAction === 'announce' || successAction === 'announce'}
+                className={`flex items-center gap-2 font-semibold px-4 py-2 rounded-lg transition-all shadow-lg ${successAction === 'announce'
+                    ? 'bg-green-600 text-white cursor-default'
+                    : 'bg-orange-600 hover:bg-orange-500 disabled:opacity-50 disabled:cursor-not-allowed text-white'
+                  }`}
               >
                 {loadingAction === 'announce' ? (
                   <><LoadingSpinner className="w-4 h-4" /> Publishing...</>
+                ) : successAction === 'announce' ? (
+                  <><CheckIcon className="w-4 h-4" /> Published! ✅</>
                 ) : (
                   <>📢 PUBLISH ON WHOP</>
                 )}
