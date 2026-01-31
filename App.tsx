@@ -225,7 +225,8 @@ const App: React.FC = () => {
       // Use course name and existing description from the product
       const courseName = state.selectedProduct.name || state.selectedProduct.title || 'Course';
       const courseDesc = state.selectedProduct.description || '';
-      const prompt = `Course: ${courseName}\n\n${courseDesc}`;
+      const optionalNotes = state.courseDescription?.trim() || '';
+      const prompt = `Course: ${courseName}\n\n${courseDesc}${optionalNotes ? `\n\nAdditional notes: ${optionalNotes}` : ''}`;
 
       const response = await fetch('/api/analyze', { method: 'POST', headers, body: JSON.stringify({ prompt }) });
       if (!response.ok) throw new Error(`Analysis Failed (${response.status})`);
@@ -381,11 +382,22 @@ const App: React.FC = () => {
             {state.selectedProduct && (
               <div className="relative z-0 bg-gray-800/40 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-6 text-center">
                 {/* Selected Course Badge */}
-                <div className="flex flex-wrap justify-center gap-2 mb-6">
+                <div className="flex flex-wrap justify-center gap-2 mb-4">
                   <span className="inline-flex items-center gap-2 bg-indigo-600/30 border border-indigo-500/50 text-indigo-300 px-4 py-2 rounded-full text-sm font-medium">
                     <BookIcon className="w-4 h-4" />
                     {state.selectedProduct.name || state.selectedProduct.title}
                   </span>
+                </div>
+
+                {/* Optional Notes - Small input for AI context */}
+                <div className="mb-4">
+                  <input
+                    type="text"
+                    value={state.courseDescription}
+                    onChange={handleDescriptionChange}
+                    placeholder="Optional: Add notes for AI (e.g. 'focus on beginners', 'mention discount')"
+                    className="w-full bg-gray-900/50 border border-gray-600/50 text-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent placeholder-gray-500"
+                  />
                 </div>
 
                 {/* Generate Button - Primary CTA */}
@@ -404,7 +416,7 @@ const App: React.FC = () => {
                     </span>
                   ) : (
                     <span className="flex items-center justify-center gap-2">
-                      ✨ Generate Marketing Content
+                      🚀 Generate Marketing Content
                     </span>
                   )}
                 </button>
