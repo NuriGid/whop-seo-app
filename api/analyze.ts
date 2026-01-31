@@ -52,9 +52,11 @@ OUTPUT: Exactly 6 raw text blocks separated by '${SEP}'. NO labels, NO headers, 
 
 CONTENT RULES:
 
-1. TWITTER THREAD (can use 1/5, 2/5 numbering for tweets):
-   - 3-5 engaging tweets with hashtags
-   - Hook readers immediately
+1. X (TWITTER) THREAD - Must be exactly 4-5 tweets (flood format):
+   - Use 1/5, 2/5, 3/5, 4/5, 5/5 numbering
+   - First tweet = powerful hook
+   - Last tweet = call-to-action with course link placeholder
+   - Include relevant hashtags
 
 2. SALES EMAIL (NO numbering like 1/5, NO Subject line, NO Dear):
    - Direct, persuasive sales pitch
