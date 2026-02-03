@@ -156,10 +156,15 @@ const LessonsPanel: React.FC<LessonsPanelProps> = ({ courseId, courseName, userN
 
     if (isLoading) {
         return (
-            <div className="bg-gray-800/40 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-6 text-center">
+            <div className="bg-gray-800/40 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-6 mt-6 text-center">
                 <div className="animate-pulse text-gray-400">Loading lessons...</div>
             </div>
         );
+    }
+
+    // Hide panel completely if no lessons or error
+    if (error || lessons.length === 0) {
+        return null;
     }
 
     return (
