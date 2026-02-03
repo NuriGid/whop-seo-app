@@ -1,22 +1,53 @@
 /**
- * CourseRocket - Marketing Content Engine v4.8 (SURGICAL REFACTOR)
+ * CourseRocket - Marketing Content Engine v4.9 (NUCLEAR SAFETY)
  * 
- * "ACIMASIZ MOD" - Kids Safety Override, Super-Aggressive Cleaning, Revenue Focus.
- * 
- * CRITICAL FIXES:
- * 1. KIDS SAFETY: Forbidden keywords (ghost, spirit, death, scary) when kids mode detected.
- * 2. SUPER REGEX: ALL label:value patterns stripped. No exceptions.
- * 3. TEMPERATURE 0.3: Structural rigidity with tonal flexibility.
+ * FIXES:
+ * 1. NUCLEAR KIDS FILTER: Complete content rewrite if kids mode detected
+ * 2. POST-GENERATION SANITIZATION: Replace ALL forbidden words after AI response
+ * 3. EXTENDED LOGGING: Track every step for debugging
  */
 
 const GROQ_API_KEY = (process.env.GROQ_API_KEY || '').trim();
 const SEP = '###NEXT_PART###';
 
-// FORBIDDEN KEYWORDS for kids audiences
-const KIDS_FORBIDDEN = ['ghost', 'spirit', 'death', 'die', 'dead', 'paranormal', 'scary', 'horror', 'trapped', 'haunted', 'creepy', 'terrifying', 'nightmare', 'demon', 'evil', 'kill', 'murder'];
+// EXTENDED Forbidden list for kids
+const KIDS_FORBIDDEN = [
+  'ghost', 'ghosts', 'ghostly', 'spirit', 'spirits', 'spiritual',
+  'death', 'die', 'dead', 'dying', 'deceased',
+  'paranormal', 'supernatural', 'psychic',
+  'scary', 'horror', 'terrifying', 'frightening', 'creepy', 'spooky',
+  'trapped', 'haunted', 'haunt', 'haunting',
+  'nightmare', 'nightmares',
+  'demon', 'demons', 'demonic', 'evil', 'malevolent',
+  'kill', 'murder', 'blood', 'curse', 'cursed',
+  'communicate with the dead', 'spirit world', 'afterlife',
+  'occult', 'séance', 'ouija', 'possession', 'exorcism'
+];
+
+// Safe replacements for kids
+const KIDS_REPLACEMENTS: Record<string, string> = {
+  'ghost': 'friendly character',
+  'ghosts': 'friendly characters',
+  'spirit': 'magical friend',
+  'spirits': 'magical friends',
+  'death': 'adventure',
+  'dead': 'sleeping',
+  'paranormal': 'magical',
+  'supernatural': 'amazing',
+  'scary': 'exciting',
+  'horror': 'adventure',
+  'haunted': 'enchanted',
+  'nightmare': 'dream',
+  'demon': 'mischievous creature',
+  'evil': 'tricky',
+  'malevolent': 'playful',
+  'psychic': 'special',
+  'communicate with': 'learn about',
+  'spirit world': 'magical world',
+  'afterlife': 'magical realm'
+};
 
 export default async function handler(req: any, res: any) {
-  // CORS
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
@@ -41,63 +72,81 @@ export default async function handler(req: any, res: any) {
   if (!GROQ_API_KEY) return returnError('GROQ_API_KEY missing.');
   if (!req.body?.prompt) return returnError('No prompt.');
 
-  // --- 1. EXTRACT USER CONTEXT ---
+  // --- 1. EXTRACT AND LOG EVERYTHING ---
   let { prompt } = req.body;
   let userNote = "";
+
+  console.log('📥 RAW PROMPT RECEIVED:', prompt.substring(0, 200));
 
   if (prompt.includes("Additional notes:")) {
     const parts = prompt.split("Additional notes:");
     prompt = parts[0].trim();
-    userNote = parts[1].trim();
+    userNote = parts[1]?.trim() || "";
   }
 
-  // --- 2. DETECT KIDS MODE ---
-  const fullContext = (prompt + " " + userNote).toLowerCase();
-  const isKidsMode = fullContext.includes('kids') || fullContext.includes('children') || fullContext.includes('çocuk') || fullContext.includes('child');
+  console.log('📝 EXTRACTED USER NOTE:', userNote || '(EMPTY)');
 
-  console.log(`🚀 Generating for: ${prompt.substring(0, 40)}...`);
-  if (userNote) console.log(`👉 MANDATE: ${userNote}`);
-  if (isKidsMode) console.log(`🧒 KIDS MODE ACTIVATED - Safety filters ON`);
+  // --- 2. DETECT KIDS MODE (Check BOTH prompt and note) ---
+  const fullContext = (prompt + " " + userNote).toLowerCase();
+  const isKidsMode =
+    fullContext.includes('kids') ||
+    fullContext.includes('children') ||
+    fullContext.includes('çocuk') ||
+    fullContext.includes('child') ||
+    fullContext.includes('kid') ||
+    userNote.toLowerCase().includes('kids') ||
+    userNote.toLowerCase().includes('focus on kids');
+
+  console.log('🧒 KIDS MODE:', isKidsMode ? 'ACTIVATED ✅' : 'OFF');
 
   try {
     // --- 3. BUILD SYSTEM PROMPT ---
     let systemPrompt = `You are a world-class Copywriter focused on REVENUE.
-Your goal is to convert traffic into sales.
 
 OUTPUT FORMAT:
 Output exactly 6 RAW text blocks separated by '${SEP}'.
 
 1: TWITTER THREAD (4-5 tweets numbered 1/, 2/, 3/, 4/, 5/)
-2: SALES EMAIL (NO Subject line, NO Dear, just the body)
+2: SALES EMAIL (NO Subject line, NO Dear, NO [Name], just start with hook)
 3: WHOP LANDING PAGE DESCRIPTION (Benefits, bullet points, CTA)
 4: COMMUNITY ANNOUNCEMENT (Emoji title first line, then body)
-5: VIDEO SCRIPT (Dialogue ONLY, no scene descriptions, no [brackets])
-6: INSTAGRAM CAPTION (Engaging hook, emojis, hashtags)
+5: VIDEO SCRIPT (Dialogue ONLY, no brackets, no scene descriptions)
+6: INSTAGRAM CAPTION (Hook, emojis, hashtags)
 
 CRITICAL RULES:
-1. RAW CONTENT ONLY. 
-2. DO NOT use labels like "Subject:", "Hook:", "Host:", "Video Script:", "Part 1:".
-3. NO markdown headers (###).
-4. Start each block DIRECTLY with the content.`;
+- RAW CONTENT ONLY
+- NO labels like "Subject:", "Hook:", "Host:", "Video Script:", "Part 1:"
+- NO markdown headers
+- NO "Dear [Name]" or placeholder names`;
 
-    // KIDS SAFETY INJECTION
+    // NUCLEAR KIDS OVERRIDE
     if (isKidsMode) {
-      systemPrompt += `
+      systemPrompt = `You are a FUN, EXCITING copywriter for KIDS CONTENT (ages 6-12).
 
-🚨 KIDS MODE - MANDATORY SAFETY OVERRIDE 🚨
-This content is for CHILDREN (ages 6-12). You MUST:
-- Use FUN, EXCITING, SAFE language
-- Theme: Magical adventure, mystery solving, Pixar-style excitement
-- FORBIDDEN WORDS: ${KIDS_FORBIDDEN.join(', ')}
-- NO scary themes, NO horror, NO dark content
-- Keep sentences simple and playful
-- Use exclamation marks and enthusiasm!`;
+🚨 ABSOLUTE RULES - VIOLATING THESE IS FORBIDDEN:
+- NEVER use: ghost, spirit, death, scary, horror, paranormal, haunted, demon, evil
+- Theme MUST be: FUN ADVENTURE, MYSTERY SOLVING, PIXAR-STYLE EXCITEMENT
+- Language: SIMPLE, PLAYFUL, USE EXCLAMATION MARKS!
+- Make everything sound like a FUN GAME or ADVENTURE
+
+OUTPUT FORMAT:
+Output exactly 6 RAW text blocks separated by '${SEP}'.
+
+1: TWITTER THREAD (4-5 fun tweets, numbered 1/, 2/, 3/, 4/, 5/)
+2: SALES EMAIL (FUN, exciting, NO Subject/Dear, just start with fun hook)
+3: LANDING PAGE (Adventure-themed, bullet points with emojis)
+4: ANNOUNCEMENT (Exciting emoji title + fun body)
+5: VIDEO SCRIPT (Fun dialogue, no brackets)
+6: INSTAGRAM (Fun caption, kid-friendly emojis, hashtags)
+
+REMEMBER: This is for KIDS! Make it FUN and SAFE!`;
     }
 
-    // --- 4. BUILD USER MESSAGE (MANDATE PRIORITY) ---
     const userMessage = userNote
-      ? `🚨 PRIMARY BEHAVIORAL OVERRIDE: ${userNote.toUpperCase()} 🚨\nFollow this mandate exactly. Ignore default patterns if they conflict.\n\nCourse Info:\n${prompt}`
-      : `Course Info:\n${prompt}`;
+      ? `🚨 PRIORITY INSTRUCTION: ${userNote.toUpperCase()} 🚨\n\nCourse: ${prompt}`
+      : `Course: ${prompt}`;
+
+    console.log('📤 SENDING TO AI...');
 
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -121,55 +170,58 @@ This content is for CHILDREN (ages 6-12). You MUST:
     const data = await response.json();
     let raw = data.choices?.[0]?.message?.content || "";
 
-    // --- 5. KIDS MODE: POST-GENERATION SAFETY FILTER ---
+    console.log('📥 AI RESPONSE LENGTH:', raw.length);
+
+    // --- 4. NUCLEAR POST-GENERATION SANITIZATION FOR KIDS ---
     if (isKidsMode) {
+      console.log('🧹 APPLYING KIDS SANITIZATION...');
+
+      // Replace forbidden phrases first (longer matches)
+      for (const [bad, good] of Object.entries(KIDS_REPLACEMENTS)) {
+        const regex = new RegExp(bad, 'gi');
+        raw = raw.replace(regex, good);
+      }
+
+      // Then replace remaining single words
       for (const word of KIDS_FORBIDDEN) {
         const regex = new RegExp(`\\b${word}\\b`, 'gi');
         raw = raw.replace(regex, 'adventure');
       }
+
+      console.log('✅ SANITIZATION COMPLETE');
     }
 
-    // --- 6. PARSING ---
+    // --- 5. PARSING ---
     let parts = raw.split(SEP);
     while (parts.length < 6) parts.push("");
 
-    // --- 7. SUPER-AGGRESSIVE CLEANING (SURGICAL) ---
+    // --- 6. AGGRESSIVE CLEANING ---
     const surgicalClean = (text: string, isTwitter: boolean): string => {
       if (!text) return "";
 
       let cleaned = text.trim();
 
-      // A. NUCLEAR OPTION: Kill ANY line starting with a word/phrase + colon
-      // This catches: "Host:", "Subject:", "Video Script:", "Part 1:", "Tweet 1:", etc.
-      cleaned = cleaned.replace(/^[A-Za-z\s\d]+:\s*.*/gm, (match) => {
-        // Exception: Keep numbered tweets for Twitter (e.g., "1/")
-        if (isTwitter && match.match(/^\d+\/\s/)) return match;
-        // Exception: Keep bullet points that have colons in content
-        if (match.match(/^[•✅-]/)) return match;
-        // Kill everything else that looks like a label
-        if (match.match(/^[A-Za-z\s]+(:|:)\s/i)) return '';
-        return match;
-      });
+      // Kill ALL label patterns
+      cleaned = cleaned.replace(/^(Host|Subject|Hook|Intro|Body|Conclusion|CTA|Caption|Post|Script|Title|Video Script|Part \d+|Tweet \d+|Email|Twitter|Landing Page|Announcement|Instagram|TikTok|Dear|To|From):\s*/gim, '');
 
-      // B. Kill specific known garbage patterns
-      cleaned = cleaned.replace(/^(Host|Subject|Hook|Intro|Body|Conclusion|CTA|Caption|Post|Script|Title|Video Script|Part \d+|Tweet \d+|Email|Twitter Thread|Landing Page|Announcement|Instagram|TikTok):\s*/gim, '');
+      // Kill "Dear [Name]," patterns
+      cleaned = cleaned.replace(/^Dear\s*\[?[^\]]*\]?,?\s*/gim, '');
+      cleaned = cleaned.replace(/\[Name\]/gi, 'friend');
 
-      // C. Kill markdown headers
+      // Kill markdown headers
       cleaned = cleaned.replace(/^#+\s*/gm, '');
 
-      // D. Kill double asterisks at block start
-      cleaned = cleaned.replace(/^\*\*[^*]+\*\*\s*/gm, '');
+      // Kill double asterisks
+      cleaned = cleaned.replace(/\*\*/g, '');
 
-      // E. Kill [Bracketed] instructions
-      cleaned = cleaned.replace(/^\[.*?\]\s*/gm, '');
+      // Kill bracketed content
       cleaned = cleaned.replace(/\[.*?\]/g, '');
 
-      // F. NUMBERING ISOLATION (Twitter only)
+      // Numbering isolation
       if (!isTwitter) {
         cleaned = cleaned.replace(/^\d+[\.\/\)]\s*/gm, '');
       }
 
-      // G. Final polish
       return cleaned.replace(/^\n+/, '').replace(/\n{3,}/g, '\n\n').trim();
     };
 
@@ -185,9 +237,8 @@ This content is for CHILDREN (ages 6-12). You MUST:
     const announcementTitle = annLines[0] || "🚀 Exciting Update!";
     const announcementBody = annLines.slice(1).join('\n').trim() || announcement;
 
-    console.log(`✅ v4.8 Cleaned: T:${twitter.length} E:${email.length} D:${description.length}`);
+    console.log(`✅ v4.9 Output: T:${twitter.length} E:${email.length} D:${description.length}`);
 
-    // Validation
     const fb = (t: string, n: string) => t.length > 10 ? t : `[${n} - Content Empty]`;
 
     return res.status(200).json({
@@ -198,7 +249,6 @@ This content is for CHILDREN (ages 6-12). You MUST:
       announcementBody: announcementBody || "Check out our latest update!",
       tiktokScript: fb(tiktok, "TikTok"),
       instagramPost: fb(instagram, "Instagram"),
-      // Legacy compatibility
       twitter, email, instagram, tiktok
     });
 
