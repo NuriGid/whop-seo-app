@@ -1,18 +1,19 @@
 /**
- * CourseRocket - Marketing Content Engine v5.0 (CONTEXTUAL FRAMING)
- * BUILD: 2026-02-03-05:05
+ * CourseRocket - Marketing Content Engine v5.1 (STRICT BLOCKS)
+ * BUILD: 2026-02-03-05:22
  * 
  * PHILOSOPHY:
  * - User Note = PRIMARY LENS (100% weight)
  * - Course Content = RAW MATERIAL (10% weight)
  * - No hardcoded keywords. Universal synchronization.
  * 
- * "AI is not a marketing bot for the course.
- *  AI is a marketing bot for the USER'S NOTE, using course data as material."
+ * v5.1 FIX: Using numbered block markers for reliable parsing
  */
 
 const GROQ_API_KEY = (process.env.GROQ_API_KEY || '').trim();
-const SEP = '###NEXT_PART###';
+
+// Block markers for reliable parsing
+const BLOCK_MARKERS = ['[BLOCK_1]', '[BLOCK_2]', '[BLOCK_3]', '[BLOCK_4]', '[BLOCK_5]', '[BLOCK_6]'];
 
 export default async function handler(req: any, res: any) {
   // CORS
@@ -44,7 +45,7 @@ export default async function handler(req: any, res: any) {
   let { prompt } = req.body;
   let userNote = "";
 
-  console.log('📥 v5.0 RAW PROMPT:', prompt.substring(0, 150));
+  console.log('📥 v5.1 RAW PROMPT:', prompt.substring(0, 150));
 
   if (prompt.includes("Additional notes:")) {
     const parts = prompt.split("Additional notes:");
@@ -56,7 +57,34 @@ export default async function handler(req: any, res: any) {
 
   try {
     // --- 2. BUILD CONTEXTUAL FRAMING PROMPT ---
-    // This is the key innovation: User note DEFINES the AI's identity
+    const outputFormat = `
+OUTPUT FORMAT (CRITICAL - FOLLOW EXACTLY):
+You MUST output exactly 6 blocks, each starting with a marker.
+DO NOT add any text before [BLOCK_1] or between blocks except the content itself.
+
+[BLOCK_1]
+Twitter thread here (4-5 tweets, numbered 1/, 2/, 3/, 4/, 5/)
+
+[BLOCK_2]
+Sales email here (Direct hook, no Subject line, no Dear)
+
+[BLOCK_3]
+Whop landing page description here (Benefits, bullet points, CTA)
+
+[BLOCK_4]
+Community announcement here (Emoji title on first line, then body)
+
+[BLOCK_5]
+TikTok/Video script here (Dialogue ONLY, no brackets or scene descriptions)
+
+[BLOCK_6]
+Instagram caption here (Engaging hook, emojis, hashtags)
+
+RULES:
+- Each block MUST start exactly with [BLOCK_X] marker
+- NO labels like "Subject:", "Hook:", "Tweet 1:", "Part 1:" inside blocks
+- RAW content only, no markdown
+- Keep each block focused on its purpose`;
 
     let systemPrompt: string;
 
@@ -78,20 +106,8 @@ EXAMPLE THINKING:
 - If note says "aggressive sales": You are a hard-sell copywriter with urgency and FOMO
 - If note says "luxury": You are a premium brand strategist with sophisticated language
 
-OUTPUT FORMAT:
-Output exactly 6 RAW text blocks separated by '${SEP}'.
-
-1: TWITTER THREAD (4-5 tweets, numbered 1/, 2/, 3/, 4/, 5/)
-2: SALES EMAIL (Direct hook, no Subject: line, no Dear)
-3: WHOP LANDING PAGE (Benefits, bullet points, CTA)
-4: COMMUNITY ANNOUNCEMENT (Emoji title first, then body)
-5: VIDEO SCRIPT (Dialogue ONLY, no brackets or scene descriptions)
-6: INSTAGRAM CAPTION (Engaging hook, emojis, hashtags)
-
-CRITICAL RULES:
-- RAW content only. No labels like "Subject:", "Hook:", "Part 1:"
-- No markdown syntax
-- Adapt EVERYTHING to the "${userNote}" perspective`;
+Adapt EVERYTHING to the "${userNote}" perspective.
+${outputFormat}`;
 
     } else {
       // DEFAULT MODE: Standard marketing (no user lens)
@@ -99,24 +115,11 @@ CRITICAL RULES:
 
 Your job is to create high-converting marketing content.
 
-OUTPUT FORMAT:
-Output exactly 6 RAW text blocks separated by '${SEP}'.
-
-1: TWITTER THREAD (4-5 tweets, numbered 1/, 2/, 3/, 4/, 5/)
-2: SALES EMAIL (Direct hook, no Subject: line, no Dear)
-3: WHOP LANDING PAGE (Benefits, bullet points, CTA)
-4: COMMUNITY ANNOUNCEMENT (Emoji title first, then body)
-5: VIDEO SCRIPT (Dialogue ONLY, no brackets)
-6: INSTAGRAM CAPTION (Engaging hook, emojis, hashtags)
-
-CRITICAL RULES:
-- RAW content only. No labels like "Subject:", "Hook:", "Part 1:"
-- No markdown syntax
-- Focus on conversion and engagement`;
+Focus on conversion, engagement, and clear value propositions.
+${outputFormat}`;
     }
 
     // --- 3. BUILD USER MESSAGE ---
-    // Course content is provided as "material to work with"
     const userMessage = userNote
       ? `REMEMBER: You are writing for "${userNote}". Transform the following course material through that lens:\n\n${prompt}`
       : `Create marketing content for:\n\n${prompt}`;
@@ -136,7 +139,7 @@ CRITICAL RULES:
           { role: "system", content: systemPrompt },
           { role: "user", content: userMessage }
         ],
-        temperature: 0.2,  // Low for consistency/loyalty to instructions
+        temperature: 0.2,
         max_tokens: 4000
       })
     });
@@ -148,55 +151,72 @@ CRITICAL RULES:
 
     console.log('📥 AI Response length:', raw.length);
 
-    // --- 5. PARSING ---
-    let parts = raw.split(SEP);
-    while (parts.length < 6) parts.push("");
+    // --- 5. PARSE BLOCKS BY MARKERS ---
+    const parseBlocks = (text: string): string[] => {
+      const blocks: string[] = ['', '', '', '', '', ''];
 
-    // --- 6. REGEX SHIELD (Universal Cleaning) ---
-    const regexShield = (text: string, isTwitter: boolean): string => {
+      for (let i = 0; i < 6; i++) {
+        const currentMarker = BLOCK_MARKERS[i];
+        const nextMarker = BLOCK_MARKERS[i + 1];
+
+        const startIdx = text.indexOf(currentMarker);
+        if (startIdx === -1) continue;
+
+        const contentStart = startIdx + currentMarker.length;
+        let contentEnd: number;
+
+        if (nextMarker) {
+          const nextIdx = text.indexOf(nextMarker);
+          contentEnd = nextIdx !== -1 ? nextIdx : text.length;
+        } else {
+          contentEnd = text.length;
+        }
+
+        blocks[i] = text.substring(contentStart, contentEnd).trim();
+      }
+
+      return blocks;
+    };
+
+    const blocks = parseBlocks(raw);
+    console.log('📦 Parsed blocks:', blocks.map((b, i) => `B${i + 1}:${b.length}`).join(' '));
+
+    // --- 6. CLEAN CONTENT ---
+    const cleanContent = (text: string, isTwitter: boolean): string => {
       if (!text) return "";
 
       let cleaned = text.trim();
 
-      // A. Delete lines where first 3 words contain a colon
-      // This kills: "Subject: ...", "Hook: ...", "Part 1: ...", "Tweet 1: ..."
-      cleaned = cleaned.split('\n').filter(line => {
-        const firstFewWords = line.trim().split(/\s+/).slice(0, 3).join(' ');
-        // If colon exists in first 3 words, it's likely a label - delete the line
-        if (firstFewWords.includes(':') && !line.trim().match(/^[0-9]+\//)) {
-          return false; // Delete this line
-        }
-        return true;
-      }).join('\n');
+      // Remove any lingering labels
+      cleaned = cleaned.replace(/^(Subject|Hook|Tweet \d+|Part \d+|Email|Caption|Script|Title|Intro|Body|CTA):\s*/gim, '');
 
-      // B. Remove markdown syntax
-      cleaned = cleaned.replace(/\*\*/g, '');  // Bold
-      cleaned = cleaned.replace(/^#+\s*/gm, '');  // Headers
-      cleaned = cleaned.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1');  // Links
-      cleaned = cleaned.replace(/\[.*?\]/g, '');  // Bracketed content
+      // Remove markdown
+      cleaned = cleaned.replace(/\*\*/g, '');
+      cleaned = cleaned.replace(/^#+\s*/gm, '');
+      cleaned = cleaned.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1');
+      cleaned = cleaned.replace(/\[.*?\]/g, '');
 
-      // C. Numbering isolation (only Twitter keeps 1/, 2/)
+      // Numbering isolation (only Twitter keeps 1/, 2/)
       if (!isTwitter) {
         cleaned = cleaned.replace(/^\d+[\.\/\)]\s*/gm, '');
       }
 
-      // D. Clean up whitespace
       return cleaned.replace(/^\n+/, '').replace(/\n{3,}/g, '\n\n').trim();
     };
 
-    const twitter = regexShield(parts[0], true);
-    const email = regexShield(parts[1], false);
-    const description = regexShield(parts[2], false);
-    const announcement = regexShield(parts[3], false);
-    const tiktok = regexShield(parts[4], false);
-    const instagram = regexShield(parts[5], false);
+    const twitter = cleanContent(blocks[0], true);
+    const email = cleanContent(blocks[1], false);
+    const description = cleanContent(blocks[2], false);
+    const announcement = cleanContent(blocks[3], false);
+    const tiktok = cleanContent(blocks[4], false);
+    const instagram = cleanContent(blocks[5], false);
 
     // Announcement title extraction
     const annLines = announcement.split('\n').filter(l => l.trim());
     const announcementTitle = annLines[0] || "🚀 Exciting Update!";
     const announcementBody = annLines.slice(1).join('\n').trim() || announcement;
 
-    console.log(`✅ v5.0 Output: T:${twitter.length} E:${email.length} D:${description.length}`);
+    console.log(`✅ v5.1 Output: T:${twitter.length} E:${email.length} D:${description.length} A:${announcement.length} TK:${tiktok.length} I:${instagram.length}`);
 
     // Fallback for empty content
     const fb = (t: string, n: string) => t.length > 10 ? t : `[${n} - Content Empty]`;
