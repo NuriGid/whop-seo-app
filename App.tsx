@@ -254,7 +254,7 @@ const App: React.FC = () => {
       console.error('❌ Analysis Error:', error);
       setState(prev => ({ ...prev, isAnalyzing: false, analysisError: error instanceof Error ? error.message : 'Analysis failed' }));
     }
-  }, [state.selectedProduct, state.userToken, state.companyId]);
+  }, [state.selectedProduct, state.userToken, state.companyId, state.courseDescription]);
 
   const handleUpdateOnWhop = useCallback(async (content: string, contentType: string) => {
     if (!state.selectedProduct) return;
