@@ -208,8 +208,9 @@ const App: React.FC = () => {
     setState(prev => ({ ...prev, isDropdownOpen: !prev.isDropdownOpen }));
   }, []);
 
-  const handleDescriptionChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+  const handleDescriptionChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setState(prev => ({ ...prev, courseDescription: e.target.value }));
+    console.log('📝 Optional Notes Updated:', e.target.value); // DEBUG
   }, []);
 
   const handleAnalyze = useCallback(async () => {
@@ -228,6 +229,9 @@ const App: React.FC = () => {
       const courseDesc = state.selectedProduct.description || '';
       const optionalNotes = state.courseDescription?.trim() || '';
       const prompt = `Course: ${courseName}\n\n${courseDesc}${optionalNotes ? `\n\nAdditional notes: ${optionalNotes}` : ''}`;
+
+      console.log('🚀 PROMPT BEING SENT:', prompt); // DEBUG - Remove after testing
+      console.log('👉 OPTIONAL NOTES VALUE:', optionalNotes); // DEBUG
 
       const response = await fetch('/api/analyze', { method: 'POST', headers, body: JSON.stringify({ prompt }) });
       if (!response.ok) throw new Error(`Analysis Failed (${response.status})`);
