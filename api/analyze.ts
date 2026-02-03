@@ -44,8 +44,16 @@ export default async function handler(req: any, res: any) {
   // --- 1. EXTRACT USER CONTEXT ---
   let { prompt } = req.body;
   let userNote = "";
+  let courseName = "Course"; // Default fallback
 
-  console.log('📥 v5.1 RAW PROMPT:', prompt.substring(0, 150));
+  console.log('📥 v5.5 RAW PROMPT:', prompt.substring(0, 150));
+
+  // Extract course name from prompt (format: "Course: XYZ\n\n...")
+  const courseMatch = prompt.match(/^Course:\s*(.+?)(?:\n|$)/i);
+  if (courseMatch) {
+    courseName = courseMatch[1].trim();
+    console.log('📚 COURSE NAME EXTRACTED:', courseName);
+  }
 
   if (prompt.includes("Additional notes:")) {
     const parts = prompt.split("Additional notes:");
@@ -113,24 +121,32 @@ EXAMPLE THINKING:
 - If note says "luxury": You are a premium brand strategist with sophisticated language
 
 Adapt EVERYTHING to the "${userNote}" perspective.
+CRITICAL: The course is called "${courseName}". ALL content must be specifically about "${courseName}".
 ${outputFormat}`;
 
     } else {
-      // DEFAULT MODE: Standard marketing (no user lens)
+      // DEFAULT MODE: Standard marketing but MUST use course topic
       systemPrompt = `You are a world-class Direct-Response Copywriter.
 
-Your job is to create high-converting marketing content.
+CRITICAL REQUIREMENT: You are writing about a course called "${courseName}".
+ALL content MUST be specifically about "${courseName}" - the actual topic, not generic marketing.
 
+If the course name is unclear (like "Bats"), interpret it creatively:
+- "Bats" could be about baseball bats, animal bats, or bat equipment
+- Use context clues from any description provided
+- Make the content interesting and specific to the topic
+
+Your job is to create high-converting marketing content about "${courseName}".
 Focus on conversion, engagement, and clear value propositions.
 ${outputFormat}`;
     }
 
     // --- 3. BUILD USER MESSAGE ---
     const userMessage = userNote
-      ? `REMEMBER: You are writing for "${userNote}". Transform the following course material through that lens:\n\n${prompt}`
-      : `Create marketing content for:\n\n${prompt}`;
+      ? `REMEMBER: You are writing for "${userNote}". The course is "${courseName}". Transform the following course material through that lens:\n\n${prompt}`
+      : `Create marketing content for the course "${courseName}". Make ALL content specifically about this topic:\n\n${prompt}`;
 
-    console.log('📤 Sending to AI with lens:', userNote || 'default');
+    console.log('📤 v5.5 Sending to AI | Course:', courseName, '| Lens:', userNote || 'default');
 
     // --- 4. CALL AI ---
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
