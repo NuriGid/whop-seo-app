@@ -4,6 +4,7 @@ import ResultCard from './components/ResultCard';
 import Loader from './components/Loader';
 import PlansTable from './components/PlansTable';
 import PaymentsTable from './components/PaymentsTable';
+import LessonsPanel from './components/LessonsPanel';
 
 interface AppState {
   isLoading: boolean;
@@ -328,7 +329,7 @@ const App: React.FC = () => {
         <div className="text-center mb-8">
           <div className="inline-block mb-2">
             <span className="text-xs font-semibold bg-gradient-to-r from-green-500 to-emerald-500 text-white px-3 py-1 rounded-full">
-              Contextual v5.1
+              Lessons v5.2
             </span>
           </div>
           <h1 className="text-4xl font-bold bg-gradient-to-r from-indigo-400 via-purple-500 to-pink-500 bg-clip-text text-transparent mb-3">
@@ -434,6 +435,13 @@ const App: React.FC = () => {
                     </span>
                   )}
                 </button>
+
+                {/* Lessons Panel - Phase 2A */}
+                <LessonsPanel
+                  courseId={state.selectedProduct.id}
+                  courseName={state.selectedProduct.name || state.selectedProduct.title || 'Course'}
+                  userNote={state.courseDescription}
+                />
               </div>
             )}
 
