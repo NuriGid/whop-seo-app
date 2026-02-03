@@ -1,54 +1,21 @@
 /**
- * CourseRocket - Marketing Content Engine v4.9 (NUCLEAR SAFETY)
- * BUILD: 2026-02-03-04:24
+ * CourseRocket - Marketing Content Engine v5.0 (CONTEXTUAL FRAMING)
+ * BUILD: 2026-02-03-05:05
  * 
- * FIXES:
- * 1. NUCLEAR KIDS FILTER: Complete content rewrite if kids mode detected
- * 2. POST-GENERATION SANITIZATION: Replace ALL forbidden words after AI response
- * 3. EXTENDED LOGGING: Track every step for debugging
+ * PHILOSOPHY:
+ * - User Note = PRIMARY LENS (100% weight)
+ * - Course Content = RAW MATERIAL (10% weight)
+ * - No hardcoded keywords. Universal synchronization.
+ * 
+ * "AI is not a marketing bot for the course.
+ *  AI is a marketing bot for the USER'S NOTE, using course data as material."
  */
 
 const GROQ_API_KEY = (process.env.GROQ_API_KEY || '').trim();
 const SEP = '###NEXT_PART###';
 
-// EXTENDED Forbidden list for kids
-const KIDS_FORBIDDEN = [
-  'ghost', 'ghosts', 'ghostly', 'spirit', 'spirits', 'spiritual',
-  'death', 'die', 'dead', 'dying', 'deceased',
-  'paranormal', 'supernatural', 'psychic',
-  'scary', 'horror', 'terrifying', 'frightening', 'creepy', 'spooky',
-  'trapped', 'haunted', 'haunt', 'haunting',
-  'nightmare', 'nightmares',
-  'demon', 'demons', 'demonic', 'evil', 'malevolent',
-  'kill', 'murder', 'blood', 'curse', 'cursed',
-  'communicate with the dead', 'spirit world', 'afterlife',
-  'occult', 'séance', 'ouija', 'possession', 'exorcism'
-];
-
-// Safe replacements for kids
-const KIDS_REPLACEMENTS: Record<string, string> = {
-  'ghost': 'friendly character',
-  'ghosts': 'friendly characters',
-  'spirit': 'magical friend',
-  'spirits': 'magical friends',
-  'death': 'adventure',
-  'dead': 'sleeping',
-  'paranormal': 'magical',
-  'supernatural': 'amazing',
-  'scary': 'exciting',
-  'horror': 'adventure',
-  'haunted': 'enchanted',
-  'nightmare': 'dream',
-  'demon': 'mischievous creature',
-  'evil': 'tricky',
-  'malevolent': 'playful',
-  'psychic': 'special',
-  'communicate with': 'learn about',
-  'spirit world': 'magical world',
-  'afterlife': 'magical realm'
-};
-
 export default async function handler(req: any, res: any) {
+  // CORS
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
@@ -73,11 +40,11 @@ export default async function handler(req: any, res: any) {
   if (!GROQ_API_KEY) return returnError('GROQ_API_KEY missing.');
   if (!req.body?.prompt) return returnError('No prompt.');
 
-  // --- 1. EXTRACT AND LOG EVERYTHING ---
+  // --- 1. EXTRACT USER CONTEXT ---
   let { prompt } = req.body;
   let userNote = "";
 
-  console.log('📥 RAW PROMPT RECEIVED:', prompt.substring(0, 200));
+  console.log('📥 v5.0 RAW PROMPT:', prompt.substring(0, 150));
 
   if (prompt.includes("Additional notes:")) {
     const parts = prompt.split("Additional notes:");
@@ -85,70 +52,78 @@ export default async function handler(req: any, res: any) {
     userNote = parts[1]?.trim() || "";
   }
 
-  console.log('📝 EXTRACTED USER NOTE:', userNote || '(EMPTY)');
-
-  // --- 2. DETECT KIDS MODE (Check BOTH prompt and note) ---
-  const fullContext = (prompt + " " + userNote).toLowerCase();
-  const isKidsMode =
-    fullContext.includes('kids') ||
-    fullContext.includes('children') ||
-    fullContext.includes('çocuk') ||
-    fullContext.includes('child') ||
-    fullContext.includes('kid') ||
-    userNote.toLowerCase().includes('kids') ||
-    userNote.toLowerCase().includes('focus on kids');
-
-  console.log('🧒 KIDS MODE:', isKidsMode ? 'ACTIVATED ✅' : 'OFF');
+  console.log('🎯 USER LENS:', userNote || '(No lens - default marketing)');
 
   try {
-    // --- 3. BUILD SYSTEM PROMPT ---
-    let systemPrompt = `You are a world-class Copywriter focused on REVENUE.
+    // --- 2. BUILD CONTEXTUAL FRAMING PROMPT ---
+    // This is the key innovation: User note DEFINES the AI's identity
+
+    let systemPrompt: string;
+
+    if (userNote) {
+      // CONTEXTUAL FRAMING: User note is the PRIMARY LENS
+      systemPrompt = `You are a world-class marketing expert specialized in: "${userNote}"
+
+YOUR PRIMARY MISSION: Create content that perfectly targets "${userNote}".
+
+The course information below is ONLY raw material. Your job is to TRANSFORM it through the lens of "${userNote}".
+
+INSTRUCTION HIERARCHY (STRICT):
+1. User's Note ("${userNote}") = YOUR IDENTITY. This is WHO you are writing for. (100% priority)
+2. Course Content = Raw material to adapt. (10% priority - just use the topic/theme)
+
+EXAMPLE THINKING:
+- If note says "kids": You are a children's book author making everything fun, simple, exciting
+- If note says "retirees": You are a senior lifestyle expert with calm, clear, nostalgic tone
+- If note says "aggressive sales": You are a hard-sell copywriter with urgency and FOMO
+- If note says "luxury": You are a premium brand strategist with sophisticated language
 
 OUTPUT FORMAT:
 Output exactly 6 RAW text blocks separated by '${SEP}'.
 
-1: TWITTER THREAD (4-5 tweets numbered 1/, 2/, 3/, 4/, 5/)
-2: SALES EMAIL (NO Subject line, NO Dear, NO [Name], just start with hook)
-3: WHOP LANDING PAGE DESCRIPTION (Benefits, bullet points, CTA)
-4: COMMUNITY ANNOUNCEMENT (Emoji title first line, then body)
-5: VIDEO SCRIPT (Dialogue ONLY, no brackets, no scene descriptions)
-6: INSTAGRAM CAPTION (Hook, emojis, hashtags)
+1: TWITTER THREAD (4-5 tweets, numbered 1/, 2/, 3/, 4/, 5/)
+2: SALES EMAIL (Direct hook, no Subject: line, no Dear)
+3: WHOP LANDING PAGE (Benefits, bullet points, CTA)
+4: COMMUNITY ANNOUNCEMENT (Emoji title first, then body)
+5: VIDEO SCRIPT (Dialogue ONLY, no brackets or scene descriptions)
+6: INSTAGRAM CAPTION (Engaging hook, emojis, hashtags)
 
 CRITICAL RULES:
-- RAW CONTENT ONLY
-- NO labels like "Subject:", "Hook:", "Host:", "Video Script:", "Part 1:"
-- NO markdown headers
-- NO "Dear [Name]" or placeholder names`;
+- RAW content only. No labels like "Subject:", "Hook:", "Part 1:"
+- No markdown syntax
+- Adapt EVERYTHING to the "${userNote}" perspective`;
 
-    // NUCLEAR KIDS OVERRIDE
-    if (isKidsMode) {
-      systemPrompt = `You are a FUN, EXCITING copywriter for KIDS CONTENT (ages 6-12).
+    } else {
+      // DEFAULT MODE: Standard marketing (no user lens)
+      systemPrompt = `You are a world-class Direct-Response Copywriter.
 
-🚨 ABSOLUTE RULES - VIOLATING THESE IS FORBIDDEN:
-- NEVER use: ghost, spirit, death, scary, horror, paranormal, haunted, demon, evil
-- Theme MUST be: FUN ADVENTURE, MYSTERY SOLVING, PIXAR-STYLE EXCITEMENT
-- Language: SIMPLE, PLAYFUL, USE EXCLAMATION MARKS!
-- Make everything sound like a FUN GAME or ADVENTURE
+Your job is to create high-converting marketing content.
 
 OUTPUT FORMAT:
 Output exactly 6 RAW text blocks separated by '${SEP}'.
 
-1: TWITTER THREAD (4-5 fun tweets, numbered 1/, 2/, 3/, 4/, 5/)
-2: SALES EMAIL (FUN, exciting, NO Subject/Dear, just start with fun hook)
-3: LANDING PAGE (Adventure-themed, bullet points with emojis)
-4: ANNOUNCEMENT (Exciting emoji title + fun body)
-5: VIDEO SCRIPT (Fun dialogue, no brackets)
-6: INSTAGRAM (Fun caption, kid-friendly emojis, hashtags)
+1: TWITTER THREAD (4-5 tweets, numbered 1/, 2/, 3/, 4/, 5/)
+2: SALES EMAIL (Direct hook, no Subject: line, no Dear)
+3: WHOP LANDING PAGE (Benefits, bullet points, CTA)
+4: COMMUNITY ANNOUNCEMENT (Emoji title first, then body)
+5: VIDEO SCRIPT (Dialogue ONLY, no brackets)
+6: INSTAGRAM CAPTION (Engaging hook, emojis, hashtags)
 
-REMEMBER: This is for KIDS! Make it FUN and SAFE!`;
+CRITICAL RULES:
+- RAW content only. No labels like "Subject:", "Hook:", "Part 1:"
+- No markdown syntax
+- Focus on conversion and engagement`;
     }
 
+    // --- 3. BUILD USER MESSAGE ---
+    // Course content is provided as "material to work with"
     const userMessage = userNote
-      ? `🚨 PRIORITY INSTRUCTION: ${userNote.toUpperCase()} 🚨\n\nCourse: ${prompt}`
-      : `Course: ${prompt}`;
+      ? `REMEMBER: You are writing for "${userNote}". Transform the following course material through that lens:\n\n${prompt}`
+      : `Create marketing content for:\n\n${prompt}`;
 
-    console.log('📤 SENDING TO AI...');
+    console.log('📤 Sending to AI with lens:', userNote || 'default');
 
+    // --- 4. CALL AI ---
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -161,7 +136,7 @@ REMEMBER: This is for KIDS! Make it FUN and SAFE!`;
           { role: "system", content: systemPrompt },
           { role: "user", content: userMessage }
         ],
-        temperature: 0.3,
+        temperature: 0.2,  // Low for consistency/loyalty to instructions
         max_tokens: 4000
       })
     });
@@ -171,75 +146,59 @@ REMEMBER: This is for KIDS! Make it FUN and SAFE!`;
     const data = await response.json();
     let raw = data.choices?.[0]?.message?.content || "";
 
-    console.log('📥 AI RESPONSE LENGTH:', raw.length);
-
-    // --- 4. NUCLEAR POST-GENERATION SANITIZATION FOR KIDS ---
-    if (isKidsMode) {
-      console.log('🧹 APPLYING KIDS SANITIZATION...');
-
-      // Replace forbidden phrases first (longer matches)
-      for (const [bad, good] of Object.entries(KIDS_REPLACEMENTS)) {
-        const regex = new RegExp(bad, 'gi');
-        raw = raw.replace(regex, good);
-      }
-
-      // Then replace remaining single words
-      for (const word of KIDS_FORBIDDEN) {
-        const regex = new RegExp(`\\b${word}\\b`, 'gi');
-        raw = raw.replace(regex, 'adventure');
-      }
-
-      console.log('✅ SANITIZATION COMPLETE');
-    }
+    console.log('📥 AI Response length:', raw.length);
 
     // --- 5. PARSING ---
     let parts = raw.split(SEP);
     while (parts.length < 6) parts.push("");
 
-    // --- 6. AGGRESSIVE CLEANING ---
-    const surgicalClean = (text: string, isTwitter: boolean): string => {
+    // --- 6. REGEX SHIELD (Universal Cleaning) ---
+    const regexShield = (text: string, isTwitter: boolean): string => {
       if (!text) return "";
 
       let cleaned = text.trim();
 
-      // Kill ALL label patterns
-      cleaned = cleaned.replace(/^(Host|Subject|Hook|Intro|Body|Conclusion|CTA|Caption|Post|Script|Title|Video Script|Part \d+|Tweet \d+|Email|Twitter|Landing Page|Announcement|Instagram|TikTok|Dear|To|From):\s*/gim, '');
+      // A. Delete lines where first 3 words contain a colon
+      // This kills: "Subject: ...", "Hook: ...", "Part 1: ...", "Tweet 1: ..."
+      cleaned = cleaned.split('\n').filter(line => {
+        const firstFewWords = line.trim().split(/\s+/).slice(0, 3).join(' ');
+        // If colon exists in first 3 words, it's likely a label - delete the line
+        if (firstFewWords.includes(':') && !line.trim().match(/^[0-9]+\//)) {
+          return false; // Delete this line
+        }
+        return true;
+      }).join('\n');
 
-      // Kill "Dear [Name]," patterns
-      cleaned = cleaned.replace(/^Dear\s*\[?[^\]]*\]?,?\s*/gim, '');
-      cleaned = cleaned.replace(/\[Name\]/gi, 'friend');
+      // B. Remove markdown syntax
+      cleaned = cleaned.replace(/\*\*/g, '');  // Bold
+      cleaned = cleaned.replace(/^#+\s*/gm, '');  // Headers
+      cleaned = cleaned.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1');  // Links
+      cleaned = cleaned.replace(/\[.*?\]/g, '');  // Bracketed content
 
-      // Kill markdown headers
-      cleaned = cleaned.replace(/^#+\s*/gm, '');
-
-      // Kill double asterisks
-      cleaned = cleaned.replace(/\*\*/g, '');
-
-      // Kill bracketed content
-      cleaned = cleaned.replace(/\[.*?\]/g, '');
-
-      // Numbering isolation
+      // C. Numbering isolation (only Twitter keeps 1/, 2/)
       if (!isTwitter) {
         cleaned = cleaned.replace(/^\d+[\.\/\)]\s*/gm, '');
       }
 
+      // D. Clean up whitespace
       return cleaned.replace(/^\n+/, '').replace(/\n{3,}/g, '\n\n').trim();
     };
 
-    const twitter = surgicalClean(parts[0], true);
-    const email = surgicalClean(parts[1], false);
-    const description = surgicalClean(parts[2], false);
-    const announcement = surgicalClean(parts[3], false);
-    const tiktok = surgicalClean(parts[4], false);
-    const instagram = surgicalClean(parts[5], false);
+    const twitter = regexShield(parts[0], true);
+    const email = regexShield(parts[1], false);
+    const description = regexShield(parts[2], false);
+    const announcement = regexShield(parts[3], false);
+    const tiktok = regexShield(parts[4], false);
+    const instagram = regexShield(parts[5], false);
 
-    // Announcement Title
+    // Announcement title extraction
     const annLines = announcement.split('\n').filter(l => l.trim());
     const announcementTitle = annLines[0] || "🚀 Exciting Update!";
     const announcementBody = annLines.slice(1).join('\n').trim() || announcement;
 
-    console.log(`✅ v4.9 Output: T:${twitter.length} E:${email.length} D:${description.length}`);
+    console.log(`✅ v5.0 Output: T:${twitter.length} E:${email.length} D:${description.length}`);
 
+    // Fallback for empty content
     const fb = (t: string, n: string) => t.length > 10 ? t : `[${n} - Content Empty]`;
 
     return res.status(200).json({
