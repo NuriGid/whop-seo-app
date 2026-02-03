@@ -231,6 +231,62 @@ const ResultCard: React.FC<ResultCardProps> = ({ result, courseId, companyId, on
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {/* === SECTION 1.5: CHECKOUT OPTIMIZATION (UPSELL/CROSS-SELL) === */}
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {(result.upsellText || result.crossSellText) && (
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold text-emerald-400 mb-4 flex items-center gap-2">
+            <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
+            💰 Checkout Optimization
+          </h2>
+
+          {/* Upsell Card (Before Checkout) */}
+          {result.upsellText && (
+            <div className="bg-gradient-to-br from-emerald-900/50 to-green-900/50 backdrop-blur-sm border border-emerald-500/50 rounded-lg shadow-lg p-6 mb-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-semibold text-white flex items-center">
+                  <span className="mr-2">🛒</span>
+                  Before Checkout Upsell
+                </h3>
+                <button
+                  onClick={() => handleCopy(result.upsellText || '', 'upsell')}
+                  className="flex items-center gap-2 bg-emerald-600/50 hover:bg-emerald-600/70 text-emerald-100 px-4 py-2 rounded-lg transition-all border border-emerald-500/30"
+                >
+                  {copiedSection === 'upsell' ? <CheckIcon className="w-4 h-4" /> : <CopyIcon className="w-4 h-4" />}
+                  Copy
+                </button>
+              </div>
+              <div className="bg-black/30 rounded-lg p-4 text-gray-200 whitespace-pre-wrap text-sm border border-emerald-500/20">
+                {result.upsellText}
+              </div>
+            </div>
+          )}
+
+          {/* Cross-sell Card (After Checkout) */}
+          {result.crossSellText && (
+            <div className="bg-gradient-to-br from-teal-900/50 to-cyan-900/50 backdrop-blur-sm border border-teal-500/50 rounded-lg shadow-lg p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-semibold text-white flex items-center">
+                  <span className="mr-2">🎁</span>
+                  After Checkout Cross-sell
+                </h3>
+                <button
+                  onClick={() => handleCopy(result.crossSellText || '', 'crosssell')}
+                  className="flex items-center gap-2 bg-teal-600/50 hover:bg-teal-600/70 text-teal-100 px-4 py-2 rounded-lg transition-all border border-teal-500/30"
+                >
+                  {copiedSection === 'crosssell' ? <CheckIcon className="w-4 h-4" /> : <CopyIcon className="w-4 h-4" />}
+                  Copy
+                </button>
+              </div>
+              <div className="bg-black/30 rounded-lg p-4 text-gray-200 whitespace-pre-wrap text-sm border border-teal-500/20">
+                {result.crossSellText}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
       {/* === SECTION 2: SOCIAL DISTRIBUTION (Copy Only - At the Bottom) === */}
       {/* ═══════════════════════════════════════════════════════════════════════ */}
       <div className="pt-6 border-t border-gray-700">

@@ -13,7 +13,7 @@
 const GROQ_API_KEY = (process.env.GROQ_API_KEY || '').trim();
 
 // Block markers for reliable parsing
-const BLOCK_MARKERS = ['[BLOCK_1]', '[BLOCK_2]', '[BLOCK_3]', '[BLOCK_4]', '[BLOCK_5]', '[BLOCK_6]'];
+const BLOCK_MARKERS = ['[BLOCK_1]', '[BLOCK_2]', '[BLOCK_3]', '[BLOCK_4]', '[BLOCK_5]', '[BLOCK_6]', '[BLOCK_7]', '[BLOCK_8]'];
 
 export default async function handler(req: any, res: any) {
   // CORS
@@ -59,7 +59,7 @@ export default async function handler(req: any, res: any) {
     // --- 2. BUILD CONTEXTUAL FRAMING PROMPT ---
     const outputFormat = `
 OUTPUT FORMAT (CRITICAL - FOLLOW EXACTLY):
-You MUST output exactly 6 blocks, each starting with a marker.
+You MUST output exactly 8 blocks, each starting with a marker.
 DO NOT add any text before [BLOCK_1] or between blocks except the content itself.
 
 [BLOCK_1]
@@ -79,6 +79,12 @@ TikTok/Video script here (Dialogue ONLY, no brackets or scene descriptions)
 
 [BLOCK_6]
 Instagram caption here (Engaging hook, emojis, hashtags)
+
+[BLOCK_7]
+Before-checkout UPSELL text (Short, persuasive add-on pitch shown before payment)
+
+[BLOCK_8]
+After-checkout CROSS-SELL text (Thank you + pitch for related product)
 
 RULES:
 - Each block MUST start exactly with [BLOCK_X] marker
@@ -153,9 +159,9 @@ ${outputFormat}`;
 
     // --- 5. PARSE BLOCKS BY MARKERS ---
     const parseBlocks = (text: string): string[] => {
-      const blocks: string[] = ['', '', '', '', '', ''];
+      const blocks: string[] = ['', '', '', '', '', '', '', ''];
 
-      for (let i = 0; i < 6; i++) {
+      for (let i = 0; i < 8; i++) {
         const currentMarker = BLOCK_MARKERS[i];
         const nextMarker = BLOCK_MARKERS[i + 1];
 
@@ -210,13 +216,15 @@ ${outputFormat}`;
     const announcement = cleanContent(blocks[3], false);
     const tiktok = cleanContent(blocks[4], false);
     const instagram = cleanContent(blocks[5], false);
+    const upsell = cleanContent(blocks[6], false);
+    const crossSell = cleanContent(blocks[7], false);
 
     // Announcement title extraction
     const annLines = announcement.split('\n').filter(l => l.trim());
     const announcementTitle = annLines[0] || "🚀 Exciting Update!";
     const announcementBody = annLines.slice(1).join('\n').trim() || announcement;
 
-    console.log(`✅ v5.1 Output: T:${twitter.length} E:${email.length} D:${description.length} A:${announcement.length} TK:${tiktok.length} I:${instagram.length}`);
+    console.log(`✅ v5.3 Output: T:${twitter.length} E:${email.length} D:${description.length} U:${upsell.length} X:${crossSell.length}`);
 
     // Fallback for empty content
     const fb = (t: string, n: string) => t.length > 10 ? t : `[${n} - Content Empty]`;
@@ -229,7 +237,9 @@ ${outputFormat}`;
       announcementBody: announcementBody || "Check out our latest update!",
       tiktokScript: fb(tiktok, "TikTok"),
       instagramPost: fb(instagram, "Instagram"),
-      twitter, email, instagram, tiktok
+      upsellText: fb(upsell, "Upsell"),
+      crossSellText: fb(crossSell, "Cross-sell"),
+      twitter, email, instagram, tiktok, upsell, crossSell
     });
 
   } catch (error: any) {

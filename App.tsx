@@ -248,7 +248,10 @@ const App: React.FC = () => {
         whopAnnouncement: {
           title: result.announcementTitle || result.whopAnnouncement?.title || `🚀 ${courseName} is NOW LIVE!`,
           body: result.announcementBody || result.whopAnnouncement?.body || result.salesEmail || "Check out our latest course!"
-        }
+        },
+        // Phase 2B: Upsell/Cross-sell
+        upsellText: result.upsellText || result.upsell,
+        crossSellText: result.crossSellText || result.crossSell
       };
       setState(prev => ({ ...prev, isAnalyzing: false, analysisResult: finalResult }));
     } catch (error) {
@@ -329,7 +332,7 @@ const App: React.FC = () => {
         <div className="text-center mb-8">
           <div className="inline-block mb-2">
             <span className="text-xs font-semibold bg-gradient-to-r from-green-500 to-emerald-500 text-white px-3 py-1 rounded-full">
-              Lessons v5.2
+              Upsell v5.3
             </span>
           </div>
           <h1 className="text-4xl font-bold bg-gradient-to-r from-indigo-400 via-purple-500 to-pink-500 bg-clip-text text-transparent mb-3">

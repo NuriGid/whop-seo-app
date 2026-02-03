@@ -10,6 +10,9 @@ export interface AnalysisResult {
     title: string;
     body: string;
   };
+  // Phase 2B: Upsell/Cross-sell
+  upsellText?: string;
+  crossSellText?: string;
 }
 
 export interface WhopProduct {
