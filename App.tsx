@@ -214,7 +214,8 @@ const App: React.FC = () => {
 
   const handleAnalyze = useCallback(async () => {
     if (!state.selectedProduct) return;
-    setState(prev => ({ ...prev, isAnalyzing: true, analysisError: null }));
+    // v4.8: Clear previous results IMMEDIATELY to prevent ghost data
+    setState(prev => ({ ...prev, isAnalyzing: true, analysisError: null, analysisResult: null }));
     try {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (state.userToken) {
@@ -321,6 +322,11 @@ const App: React.FC = () => {
       <div className="max-w-4xl mx-auto relative z-10">
         {/* Header */}
         <div className="text-center mb-8">
+          <div className="inline-block mb-2">
+            <span className="text-xs font-semibold bg-gradient-to-r from-green-500 to-emerald-500 text-white px-3 py-1 rounded-full">
+              Revenue Max v4.8
+            </span>
+          </div>
           <h1 className="text-4xl font-bold bg-gradient-to-r from-indigo-400 via-purple-500 to-pink-500 bg-clip-text text-transparent mb-3">
             🚀 CourseRocket
           </h1>
