@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { AnalysisResult } from '../types';
+import ABTestPanel from './ABTestPanel';
 
 interface ResultCardProps {
   result: AnalysisResult;
@@ -189,6 +190,12 @@ const ResultCard: React.FC<ResultCardProps> = ({ result, courseId, companyId, on
           <div className="bg-black/30 rounded-lg p-4 text-gray-200 whitespace-pre-wrap text-sm border border-indigo-500/20">
             {result.whopSalesDescription}
           </div>
+          {/* A/B Test Panel for Description */}
+          <ABTestPanel
+            content={result.whopSalesDescription}
+            contentType="course description"
+            label="Description"
+          />
         </div>
 
         {/* Whop Announcement Card */}
