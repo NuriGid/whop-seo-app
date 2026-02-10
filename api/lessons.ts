@@ -23,14 +23,14 @@ export default async function handler(req: any, res: any) {
     const courseId = req.query.courseId;
     if (!courseId) return res.status(400).json({ error: 'courseId query parameter required' });
 
-    console.log(`📚 v6.0 Std: Fetching lessons for course: ${courseId}`);
+    console.log(`📚 v6.4 Std: Fetching lessons for course: ${courseId}`);
 
     const debug: any = { courseId, steps: [] };
 
     try {
         // 1. Fetch Lessons directly (CORRECT v1 URL)
         const lessonsUrl = `https://api.whop.com/api/v1/course_lessons?course_id=${courseId}&first=100`;
-        debug.steps.push({ step: 'lessons_v1', url: lessonsUrl });
+        debug.steps.push({ step: 'lessons_v1_request', url: lessonsUrl });
 
         const lessonsRes = await fetch(lessonsUrl, {
             method: 'GET',
@@ -40,19 +40,27 @@ export default async function handler(req: any, res: any) {
             }
         });
 
+        if (!lessonsRes.ok && lessonsRes.status !== 404) {
+            throw new Error(`Failed to fetch lessons: ${lessonsRes.status}`);
+        }
+
         const lessonsRaw = await lessonsRes.text();
         debug.steps.push({ step: 'lessons_response', status: lessonsRes.status });
 
         let directLessons: any[] = [];
         if (lessonsRes.ok) {
-            const lessonsData = JSON.parse(lessonsRaw);
-            directLessons = lessonsData.data || [];
+            try {
+                const lessonsData = JSON.parse(lessonsRaw);
+                directLessons = lessonsData.data || [];
+            } catch (e) {
+                console.error("Failed to parse lessons JSON", e);
+            }
         }
         console.log(`📦 Found ${directLessons.length} direct lessons`);
 
-        // 2. Fetch Chapters (lessons might be nested in some cases or we need chapter info)
+        // 2. Fetch Chapters
         const chaptersUrl = `https://api.whop.com/api/v1/course_chapters?course_id=${courseId}&first=50`;
-        debug.steps.push({ step: 'chapters_v1', url: chaptersUrl });
+        debug.steps.push({ step: 'chapters_v1_request', url: chaptersUrl });
 
         const chaptersRes = await fetch(chaptersUrl, {
             method: 'GET',
@@ -62,17 +70,25 @@ export default async function handler(req: any, res: any) {
             }
         });
 
+        if (!chaptersRes.ok && chaptersRes.status !== 404) {
+            throw new Error(`Failed to fetch chapters: ${chaptersRes.status}`);
+        }
+
         const chaptersRaw = await chaptersRes.text();
         debug.steps.push({ step: 'chapters_response', status: chaptersRes.status });
 
         let chapters: any[] = [];
         if (chaptersRes.ok) {
-            const chaptersData = JSON.parse(chaptersRaw);
-            chapters = chaptersData.data || [];
+            try {
+                const chaptersData = JSON.parse(chaptersRaw);
+                chapters = chaptersData.data || [];
+            } catch (e) {
+                console.error("Failed to parse chapters JSON", e);
+            }
         }
         console.log(`📦 Found ${chapters.length} chapters`);
 
-        // 3. Extract lessons from chapters (some lessons might only appear here)
+        // 3. Extract lessons from chapters
         const chapterLessons: any[] = [];
         chapters.forEach((chapter: any) => {
             if (chapter.lessons && Array.isArray(chapter.lessons)) {
@@ -95,10 +111,9 @@ export default async function handler(req: any, res: any) {
         });
 
         const allLessons = Array.from(allLessonsMap.values());
-        console.log(`✅ Total unique lessons found: ${allLessons.length}`);
+        console.log(`✅ v6.4 Total unique lessons found: ${allLessons.length}`);
 
         // 5. Map to simplified format
-
         const mappedLessons = allLessons
             .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
             .map((lesson: any) => {

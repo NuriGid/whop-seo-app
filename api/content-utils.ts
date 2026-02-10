@@ -43,8 +43,8 @@ export function extractPlainText(content: any): string {
 export function extractLinksFromContent(content: any): string[] {
     const jsonStr = typeof content === 'object' ? JSON.stringify(content) : String(content);
 
-    // Regular expression for common media links
-    const urlRegex = /https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/|loom\.com\/share\/|[^\s"'<>]+?\.pdf)[^\s"'<>]+/gi;
+    // v6.4 EXPANDED REGEX: Handles /embed/, /shorts/, /v/, etc.
+    const urlRegex = /https?:\/\/(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/|v\/)|youtu\.be\/|loom\.com\/share\/|[^\s"'<>]+?\.pdf)[^\s"'<>]+/gi;
     const matches = jsonStr.match(urlRegex) || [];
 
     // Also look specifically for TipTap link marks
@@ -79,7 +79,8 @@ export function extractLinksFromContent(content: any): string[] {
  */
 export function deepSearchUrls(obj: any): string[] {
     const urls: string[] = [];
-    const urlRegex = /https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/|loom\.com\/share\/|[^\s"'<>]+?\.pdf)[^\s"'<>]+/gi;
+    // v6.4 EXPANDED REGEX: Consistent across all search tools
+    const urlRegex = /https?:\/\/(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/|v\/)|youtu\.be\/|loom\.com\/share\/|[^\s"'<>]+?\.pdf)[^\s"'<>]+/gi;
 
     const scan = (item: any) => {
         if (!item) return;
