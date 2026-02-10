@@ -1,5 +1,5 @@
 /**
- * CourseRocket - Lessons API
+ * CourseRocket v6.0 - Lessons API (with diagnostics)
  * 
  * Lists all lessons for a given course.
  * Endpoint: GET /api/lessons?courseId=cors_xxx
@@ -25,44 +25,66 @@ export default async function handler(req: any, res: any) {
     const courseId = req.query.courseId;
     if (!courseId) return res.status(400).json({ error: 'courseId query parameter required' });
 
-    console.log(`📚 Fetching lessons for course: ${courseId}`);
+    console.log(`📚 v6.0 Fetching lessons for course: ${courseId}`);
+
+    const debug: any = { courseId, steps: [] };
 
     try {
-        // 1. Fetch Lessons directly
-        const lessonsRes = await fetch(
-            `https://api.whop.com/api/v5/course-lessons?course_id=${courseId}&first=100`,
-            {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${apiKey}`,
-                    'Content-Type': 'application/json'
-                }
-            }
-        );
+        // ─── STEP 1: Try direct lessons fetch ───
+        const lessonsUrl = `https://api.whop.com/api/v5/course-lessons?course_id=${courseId}&first=100`;
+        debug.steps.push({ step: 'direct_lessons', url: lessonsUrl });
 
-        const lessonsData = lessonsRes.ok ? await lessonsRes.json() : { data: [] };
-        const directLessons = lessonsData.data || [];
+        const lessonsRes = await fetch(lessonsUrl, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const lessonsRaw = await lessonsRes.text();
+        debug.steps.push({ step: 'direct_lessons_response', status: lessonsRes.status, bodyPreview: lessonsRaw.substring(0, 300) });
+        console.log(`📦 Direct lessons response (${lessonsRes.status}): ${lessonsRaw.substring(0, 200)}`);
+
+        let directLessons: any[] = [];
+        try {
+            const lessonsData = JSON.parse(lessonsRaw);
+            directLessons = lessonsData.data || [];
+        } catch (e) {
+            debug.steps.push({ step: 'direct_lessons_parse_error', error: 'Could not parse JSON' });
+        }
         console.log(`📦 Found ${directLessons.length} direct lessons`);
 
-        // 2. Fetch Chapters (lessons might be nested here)
-        const chaptersRes = await fetch(
-            `https://api.whop.com/api/v5/course-chapters?course_id=${courseId}&first=50`,
-            {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${apiKey}`,
-                    'Content-Type': 'application/json'
-                }
-            }
-        );
+        // ─── STEP 2: Fetch chapters (lessons might be nested) ───
+        const chaptersUrl = `https://api.whop.com/api/v5/course-chapters?course_id=${courseId}&first=50`;
+        debug.steps.push({ step: 'chapters', url: chaptersUrl });
 
-        const chaptersData = chaptersRes.ok ? await chaptersRes.json() : { data: [] };
-        const chapters = chaptersData.data || [];
+        const chaptersRes = await fetch(chaptersUrl, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const chaptersRaw = await chaptersRes.text();
+        debug.steps.push({ step: 'chapters_response', status: chaptersRes.status, bodyPreview: chaptersRaw.substring(0, 300) });
+        console.log(`📦 Chapters response (${chaptersRes.status}): ${chaptersRaw.substring(0, 200)}`);
+
+        let chapters: any[] = [];
+        try {
+            const chaptersData = JSON.parse(chaptersRaw);
+            chapters = chaptersData.data || [];
+        } catch (e) {
+            debug.steps.push({ step: 'chapters_parse_error', error: 'Could not parse JSON' });
+        }
         console.log(`📦 Found ${chapters.length} chapters`);
 
-        // 3. Extract lessons from chapters
+        // ─── STEP 3: Extract lessons from chapters ───
         const chapterLessons: any[] = [];
         chapters.forEach((chapter: any) => {
+            debug.steps.push({ step: 'chapter_inspect', chapterId: chapter.id, title: chapter.title, hasLessons: !!(chapter.lessons), lessonCount: chapter.lessons?.length || 0, keys: Object.keys(chapter).join(',') });
+
             if (chapter.lessons && Array.isArray(chapter.lessons)) {
                 chapter.lessons.forEach((lesson: any) => {
                     chapterLessons.push({
@@ -74,18 +96,50 @@ export default async function handler(req: any, res: any) {
         });
         console.log(`📦 Found ${chapterLessons.length} lessons inside chapters`);
 
-        // 4. Merge and Deduplicate
+        // ─── STEP 4: If chapters exist but no lessons found in them, try fetching lessons per chapter ───
+        if (chapters.length > 0 && chapterLessons.length === 0 && directLessons.length === 0) {
+            console.log(`🔍 Chapters exist but no lessons found. Trying per-chapter lesson fetch...`);
+            debug.steps.push({ step: 'per_chapter_fetch', reason: 'Chapters found but no nested lessons' });
+
+            for (const chapter of chapters) {
+                const chapterLessonsUrl = `https://api.whop.com/api/v5/course-lessons?chapter_id=${chapter.id}&first=100`;
+                debug.steps.push({ step: 'chapter_lessons_fetch', chapterId: chapter.id, url: chapterLessonsUrl });
+
+                try {
+                    const clRes = await fetch(chapterLessonsUrl, {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${apiKey}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    const clRaw = await clRes.text();
+                    debug.steps.push({ step: 'chapter_lessons_response', chapterId: chapter.id, status: clRes.status, bodyPreview: clRaw.substring(0, 300) });
+                    console.log(`📦 Chapter ${chapter.id} lessons (${clRes.status}): ${clRaw.substring(0, 200)}`);
+
+                    try {
+                        const clData = JSON.parse(clRaw);
+                        const cl = clData.data || [];
+                        cl.forEach((lesson: any) => {
+                            chapterLessons.push({
+                                ...lesson,
+                                chapterTitle: chapter.title
+                            });
+                        });
+                    } catch (e) { /* skip parse errors */ }
+                } catch (e) { /* skip fetch errors */ }
+            }
+            console.log(`📦 After per-chapter fetch: ${chapterLessons.length} lessons`);
+        }
+
+        // ─── STEP 5: Merge and deduplicate ───
         const allLessonsMap = new Map();
-
-        // Add direct lessons first
         directLessons.forEach((l: any) => allLessonsMap.set(l.id, l));
-
-        // Add chapter lessons (might have more info or reveal missing ones)
         chapterLessons.forEach((l: any) => {
             if (!allLessonsMap.has(l.id)) {
                 allLessonsMap.set(l.id, l);
             } else {
-                // Enrich existing lesson with chapter info
                 const existing = allLessonsMap.get(l.id);
                 allLessonsMap.set(l.id, { ...existing, ...l });
             }
@@ -93,8 +147,9 @@ export default async function handler(req: any, res: any) {
 
         const allLessons = Array.from(allLessonsMap.values());
         console.log(`✅ Total unique lessons found: ${allLessons.length}`);
+        debug.totalLessons = allLessons.length;
 
-        // 5. Map to simplified format
+        // ─── STEP 6: Map to simplified format ───
         const mappedLessons = allLessons
             .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
             .map((lesson: any) => ({
@@ -110,11 +165,12 @@ export default async function handler(req: any, res: any) {
         return res.status(200).json({
             lessons: mappedLessons,
             count: mappedLessons.length,
-            courseId
+            courseId,
+            debug // v6.0: Include debug info for troubleshooting
         });
 
     } catch (error: any) {
         console.error('❌ Lessons API Error:', error);
-        return res.status(500).json({ error: error.message });
+        return res.status(500).json({ error: error.message, debug });
     }
 }
