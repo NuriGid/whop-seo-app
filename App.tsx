@@ -430,7 +430,7 @@ const App: React.FC = () => {
                     </span>
                   ) : state.analysisResult ? (
                     <span className="flex items-center justify-center gap-2">
-                      Engine Ignited! 🚀 (Regenerate)
+                      Engine Ignited! 🚀 (v5.7)
                     </span>
                   ) : (
                     <span className="flex items-center justify-center gap-2">

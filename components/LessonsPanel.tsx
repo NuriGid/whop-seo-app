@@ -60,6 +60,7 @@ const LessonsPanel: React.FC<LessonsPanelProps> = ({ courseId, courseName, userN
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
+                    lessonId: lesson.id,
                     lessonTitle: lesson.title,
                     courseName,
                     userNote
@@ -118,6 +119,7 @@ const LessonsPanel: React.FC<LessonsPanelProps> = ({ courseId, courseName, userN
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
+                        lessonId: lesson.id,
                         lessonTitle: lesson.title,
                         courseName,
                         userNote
@@ -182,7 +184,7 @@ const LessonsPanel: React.FC<LessonsPanelProps> = ({ courseId, courseName, userN
                         className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 disabled:opacity-50 text-white text-sm font-medium py-2 px-4 rounded-lg transition-all"
                     >
                         {isBulkGenerating ? (
-                            <span>Filling... {bulkProgress.current}/{bulkProgress.total}</span>
+                            <span>Analyzing... {bulkProgress.current}/{bulkProgress.total}</span>
                         ) : (
                             <span>⚡ Fill All Lessons</span>
                         )}
@@ -215,7 +217,11 @@ const LessonsPanel: React.FC<LessonsPanelProps> = ({ courseId, courseName, userN
                                 <div className="flex items-center gap-3">
                                     <span className="text-gray-500 text-sm font-mono">{idx + 1}.</span>
                                     <div>
-                                        <h4 className="text-white font-medium">{lesson.title}</h4>
+                                        <div className="flex items-center gap-2">
+                                            <h4 className="text-white font-medium">{lesson.title}</h4>
+                                            {lesson.lessonType === 'video' && <span className="text-[10px] bg-red-900/40 text-red-300 px-1.5 py-0.5 rounded uppercase border border-red-700/30">Video</span>}
+                                            {lesson.lessonType === 'file' && <span className="text-[10px] bg-blue-900/40 text-blue-300 px-1.5 py-0.5 rounded uppercase border border-blue-700/30">File/PDF</span>}
+                                        </div>
                                         <p className="text-gray-500 text-xs">
                                             {lesson.content ? `${lesson.content.substring(0, 50)}...` : 'No description'}
                                         </p>
@@ -226,7 +232,7 @@ const LessonsPanel: React.FC<LessonsPanelProps> = ({ courseId, courseName, userN
                                     disabled={isGenerating}
                                     className="bg-indigo-600/80 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs py-1.5 px-3 rounded-lg transition-colors"
                                 >
-                                    {isGenerating && selectedLesson?.id === lesson.id ? '...' : '✨ Generate'}
+                                    {isGenerating && selectedLesson?.id === lesson.id ? 'Analyzing...' : '✨ Generate'}
                                 </button>
                             </div>
                         </div>

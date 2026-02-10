@@ -89,10 +89,23 @@ TikTok/Video script here (Dialogue ONLY, no brackets or scene descriptions)
 Instagram caption here (Engaging hook, emojis, hashtags)
 
 [BLOCK_7]
-Before-checkout UPSELL text (Short, persuasive add-on pitch shown before payment)
+BEFORE-CHECKOUT UPSELL (CONVERSION MODE):
+- Trigger: FOMO + Loss Aversion
+- Format: 3 bullet points MAX
+- Tone: Urgent, direct, no fluff
+- Hook: "Most buyers also grab..." or "Don't leave without..."
+- Include: Price anchor, scarcity, one-line benefit per bullet
+- NO phrases: "exclusive", "comprehensive", "take to next level", "instant access"
 
 [BLOCK_8]
-After-checkout CROSS-SELL text (Thank you + pitch for related product)
+AFTER-CHECKOUT CROSS-SELL (VALUE MODE):
+- Trigger: Reciprocity + Community
+- Format: Story/narrative paragraph (NOT bullets)
+- Tone: Warm, congratulatory, helpful
+- Hook: "Now that you're in..." or "Here's what top students do next..."
+- Include: Specific result promise, community mention, soft CTA
+- NO phrases: "exclusive", "comprehensive", "take to next level", "instant access"
+- MUST BE 100% DIFFERENT from Block 7 - zero word overlap
 
 RULES:
 - Each block MUST start exactly with [BLOCK_X] marker
