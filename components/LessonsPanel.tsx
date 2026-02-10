@@ -251,8 +251,9 @@ const LessonsPanel: React.FC<LessonsPanelProps> = ({ courseId, courseName, userN
                                     <div>
                                         <div className="flex items-center gap-2">
                                             <h4 className="text-white font-medium">{lesson.title}</h4>
-                                            {lesson.lessonType === 'video' && <span className="text-[10px] bg-red-900/40 text-red-300 px-1.5 py-0.5 rounded uppercase border border-red-700/30">Video</span>}
-                                            {lesson.lessonType === 'file' && <span className="text-[10px] bg-blue-900/40 text-blue-300 px-1.5 py-0.5 rounded uppercase border border-blue-700/30">File/PDF</span>}
+                                            {lesson.lessonType === 'video' && <span className="text-[10px] bg-indigo-900/40 text-indigo-300 px-1.5 py-0.5 rounded uppercase border border-indigo-700/30">Multimedia</span>}
+                                            {lesson.lessonType === 'file' && <span className="text-[10px] bg-blue-900/40 text-blue-300 px-1.5 py-0.5 rounded uppercase border border-blue-700/30">PDF</span>}
+                                            {lesson.lessonType === 'quiz' && <span className="text-[10px] bg-orange-900/40 text-orange-300 px-1.5 py-0.5 rounded uppercase border border-orange-700/30">Quiz</span>}
                                         </div>
                                         <p className="text-gray-500 text-xs">
                                             {lesson.content ? `${lesson.content.substring(0, 50)}...` : 'No description'}

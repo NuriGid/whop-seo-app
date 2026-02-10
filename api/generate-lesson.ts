@@ -82,6 +82,17 @@ export default async function handler(req: any, res: any) {
                     if (fileNames) {
                         lessonContext += `\nRAW MATERIALS (Files Attached): ${fileNames}\n`;
                     }
+                    // Add attachment URLs to allLinks for scanning
+                    lessonData.attachments.forEach((a: any) => {
+                        if (a.url) allLinks.push(a.url);
+                        if (a.file_url) allLinks.push(a.file_url);
+                    });
+                }
+
+                // v7.4: Support for "PDF" lesson type (main_pdf field)
+                if (lessonData.main_pdf && typeof lessonData.main_pdf === 'string') {
+                    console.log(`📄 Found Main PDF: ${lessonData.main_pdf}`);
+                    allLinks.push(lessonData.main_pdf);
                 }
 
                 if (lessonData.content) {
@@ -90,8 +101,9 @@ export default async function handler(req: any, res: any) {
                     sources.push('lesson_text');
                 }
 
-                // Check for PDFs
-                const pdfs = allLinks.filter(u => u.toLowerCase().endsWith('.pdf'));
+                // Check for PDFs (deduplicated)
+                const pdfs = Array.from(new Set(allLinks.filter(u => u && u.toLowerCase().endsWith('.pdf'))));
+
                 for (const pdfUrl of pdfs) {
                     const fileName = pdfUrl.split('/').pop() || 'document.pdf';
                     const pdfText = await extractPdfText(pdfUrl, fileName);
