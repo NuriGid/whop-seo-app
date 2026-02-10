@@ -47,15 +47,14 @@ export default async function handler(req: any, res: any) {
             });
         }
 
-        // PATCH to Whop API v5
-        console.log(`📝 Updating course ${courseId} description via PATCH...`);
+        // PATCH to Whop API v1
+        console.log(`📝 Updating course ${courseId} description via PATCH (v1)...`);
 
-        const response = await fetch(`https://api.whop.com/api/v5/courses/${courseId}`, {
+        const response = await fetch(`https://api.whop.com/api/v1/courses/${courseId}`, {
             method: 'PATCH',
             headers: {
                 'Authorization': `Bearer ${apiKey}`,
-                'Content-Type': 'application/json',
-                'x-whop-api-version': '2024-12-05'
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({ description: newDescription })
         });

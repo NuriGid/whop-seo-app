@@ -47,15 +47,14 @@ export default async function handler(req: any, res: any) {
             });
         }
 
-        // POST to Whop API v5 - Announcements
-        console.log(`📢 Creating announcement: "${title}"...`);
+        // POST to Whop API v1 - Announcements
+        console.log(`📢 Creating announcement: "${title}" (v1)...`);
 
-        const response = await fetch('https://api.whop.com/api/v5/company/announcements', {
+        const response = await fetch('https://api.whop.com/api/v1/company/announcements', {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${apiKey}`,
-                'Content-Type': 'application/json',
-                'x-whop-api-version': '2024-12-05'
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({
                 title,
