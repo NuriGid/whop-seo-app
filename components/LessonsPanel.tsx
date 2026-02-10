@@ -35,6 +35,11 @@ const LessonsPanel: React.FC<LessonsPanelProps> = ({ courseId, courseName, userN
             setIsLoading(true);
             setError(null);
 
+            // v6.2: Clear state when switching courses to avoid "ghost" content
+            setGeneratedContent('');
+            setSelectedLesson(null);
+            setContentSources([]);
+
             try {
                 const response = await fetch(`/api/lessons?courseId=${courseId}`);
                 if (!response.ok) throw new Error(`Failed to fetch lessons: ${response.status}`);

@@ -169,16 +169,22 @@ export default async function handler(req: any, res: any) {
                 }
 
                 // ── D: Extract YouTube/Loom transcript ──
-                // Check multiple fields + embedded links
+                // Check multiple fields + embedded links (v6.2 Multimedia Support)
                 let videoUrl = '';
 
                 if (lessonData.video_url) {
                     videoUrl = lessonData.video_url;
                 } else if (lessonData.video?.url) {
                     videoUrl = lessonData.video.url;
+                } else if (lessonData.multimedia?.url) {
+                    videoUrl = lessonData.multimedia.url;
                 } else if (embeddedLinks.length > 0) {
                     // Look for video links in the extracted URLs
-                    videoUrl = embeddedLinks.find(u => u.includes('youtube.com') || u.includes('youtu.be') || u.includes('loom.com')) || '';
+                    videoUrl = embeddedLinks.find(u =>
+                        u.includes('youtube.com') ||
+                        u.includes('youtu.be') ||
+                        u.includes('loom.com')
+                    ) || '';
                 }
 
                 if (videoUrl) {
@@ -187,8 +193,8 @@ export default async function handler(req: any, res: any) {
                         lessonContext += `\nVIDEO TRANSCRIPT:\n${transcript}\n`;
                         sources.push('youtube_transcript');
                     }
-                } else if (lessonData.video_asset) {
-                    lessonContext += `\nVIDEO LESSON: This lesson contains an uploaded video asset (transcript not available for direct uploads).\n`;
+                } else if (lessonData.video_asset || lessonData.multimedia) {
+                    lessonContext += `\nVIDEO LESSON: This lesson contains a video/multimedia asset.\n`;
                     sources.push('video_asset_detected');
                 }
 
