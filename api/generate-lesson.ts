@@ -148,11 +148,14 @@ export default async function handler(req: any, res: any) {
                     sources.push('lesson_text');
                 }
 
-                // ── C: YouTube/Loom transcript (v6.5 Universal Scavenger) ──
+                // ── C: YouTube/Loom transcript (v6.7 Heisenberg Final) ──
                 let videoUrl = '';
 
-                // 1. Check explicit fields (Multimedia preference)
-                if (lessonData.multimedia?.url) {
+                // 1. Check explicit WHOP Embed fields (The "Heisenberg" Fix)
+                if (lessonData.embed_type === 'youtube' && lessonData.embed_id) {
+                    videoUrl = `https://www.youtube.com/watch?v=${lessonData.embed_id}`;
+                    console.log(`🎬 Found Whop Embed Video ID: ${lessonData.embed_id}`);
+                } else if (lessonData.multimedia?.url) {
                     videoUrl = lessonData.multimedia.url;
                 } else if (lessonData.video_url) {
                     videoUrl = lessonData.video_url;
@@ -200,19 +203,7 @@ export default async function handler(req: any, res: any) {
                     }
                 }
 
-                console.log(`📦 v6.5 Context size: ${lessonContext.length} chars | Sources: ${sources.join(', ')}`);
-
-                // ── D: v6.6 Forensic Reporting ──
-                const keys = Object.keys(lessonData).join(', ');
-                sources.push(`diagnostic:keys:[${keys}]`);
-
-                if (!sources.includes('youtube_transcript')) {
-                    const forensicFindings = forensicSearch(lessonData, 'youtube');
-                    if (forensicFindings.length > 0) {
-                        console.log(`🕵️ Forensic hunt found:`, forensicFindings);
-                        sources.push(`diagnostic:found:[${forensicFindings[0].substring(0, 30)}]`);
-                    }
-                }
+                console.log(`📦 v6.7 Context size: ${lessonContext.length} chars | Sources: ${sources.join(', ')}`);
             }
         } catch (err) {
             console.error('⚠️ Could not fetch lesson details:', err);

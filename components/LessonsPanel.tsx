@@ -298,23 +298,6 @@ const LessonsPanel: React.FC<LessonsPanelProps> = ({ courseId, courseName, userN
                                     📝 Text Content
                                 </span>
                             )}
-                            {contentSources.map(s => {
-                                if (s.startsWith('diagnostic:keys:')) {
-                                    return (
-                                        <span key={s} className="text-[10px] bg-slate-800/80 text-slate-400 px-2 py-0.5 rounded-full border border-slate-700/50 font-mono">
-                                            🔍 {s.replace('diagnostic:keys:', '')}
-                                        </span>
-                                    );
-                                }
-                                if (s.startsWith('diagnostic:found:')) {
-                                    return (
-                                        <span key={s} className="text-[10px] bg-indigo-900/50 text-indigo-300 px-2 py-0.5 rounded-full border border-indigo-700/30 font-mono">
-                                            🕵️ {s.replace('diagnostic:found:', '')}
-                                        </span>
-                                    );
-                                }
-                                return null;
-                            })}
                             {contentSources.includes('video_asset_detected') && (
                                 <span className="text-[10px] bg-yellow-900/50 text-yellow-300 px-2 py-0.5 rounded-full border border-yellow-700/30 font-medium">
                                     🎥 Video (no transcript)

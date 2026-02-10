@@ -54,15 +54,23 @@ export default async function handler(req: any, res: any) {
             });
         }
 
-        const data = JSON.parse(text);
+        let data: any = {};
+        if (text) {
+            try {
+                data = JSON.parse(text);
+            } catch (e) {
+                console.warn("Could not parse Whop update response as JSON, but status was OK");
+            }
+        }
+
         console.log(`✅ Lesson updated: ${lessonId}`);
 
         return res.status(200).json({
             success: true,
             lesson: {
-                id: data.id,
-                title: data.title,
-                content: data.content
+                id: data.id || lessonId,
+                title: data.title || title,
+                content: data.content || content
             }
         });
 
