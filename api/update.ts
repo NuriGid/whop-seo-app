@@ -54,7 +54,8 @@ export default async function handler(req: any, res: any) {
             method: 'PATCH',
             headers: {
                 'Authorization': `Bearer ${apiKey}`,
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'x-whop-api-version': '2024-12-05'
             },
             body: JSON.stringify({ description: newDescription })
         });
@@ -75,7 +76,7 @@ export default async function handler(req: any, res: any) {
             console.error(`❌ Whop API Error (${response.status}):`, data);
             return res.status(response.status).json({
                 success: false,
-                error: (data && data.message) || (data && data.error) || 'Failed to update course',
+                error: (data && data.message) || (data && data.error) || `Whop API Error ${response.status}`,
                 details: data
             });
         }
