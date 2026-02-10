@@ -125,6 +125,7 @@ export default async function handler(req: any, res: any) {
 
             if (lessonRes.ok) {
                 const lessonData = await lessonRes.json();
+                const { extractPlainText, extractLinksFromContent } = require('./content-utils');
 
                 // v6.0 Metadata: Extract attachment names as hammadde (raw materials)
                 if (lessonData.attachments && Array.isArray(lessonData.attachments)) {
@@ -134,9 +135,10 @@ export default async function handler(req: any, res: any) {
                     }
                 }
 
-                // ── A: Extract text content ──
+                // ── A: Extract text content (Standardize TipTap) ──
                 if (lessonData.content) {
-                    lessonContext += `\nLESSON TEXT CONTENT:\n${lessonData.content.substring(0, 3000)}\n`;
+                    const cleanText = extractPlainText(lessonData.content);
+                    lessonContext += `\nLESSON TEXT CONTENT:\n${cleanText.substring(0, 3000)}\n`;
                     sources.push('lesson_text');
                 }
 
@@ -160,18 +162,23 @@ export default async function handler(req: any, res: any) {
                     }
                 }
 
-                // ── C: Extract YouTube/Loom transcript ──
-                // Check for video URL in lesson content or video_url field
+                // ── C: Deep Extract Links from JSON (Ghosts Fix) ──
+                const embeddedLinks = extractLinksFromContent(lessonData.content);
+                if (embeddedLinks.length > 0) {
+                    console.log(`🔗 Found ${embeddedLinks.length} embedded links in content`);
+                }
+
+                // ── D: Extract YouTube/Loom transcript ──
+                // Check multiple fields + embedded links
                 let videoUrl = '';
 
                 if (lessonData.video_url) {
                     videoUrl = lessonData.video_url;
                 } else if (lessonData.video?.url) {
                     videoUrl = lessonData.video.url;
-                } else if (lessonData.content) {
-                    // Look for YouTube/Loom links in the lesson text
-                    const urls = findVideoUrls(lessonData.content);
-                    if (urls.length > 0) videoUrl = urls[0];
+                } else if (embeddedLinks.length > 0) {
+                    // Look for video links in the extracted URLs
+                    videoUrl = embeddedLinks.find(u => u.includes('youtube.com') || u.includes('youtu.be') || u.includes('loom.com')) || '';
                 }
 
                 if (videoUrl) {
@@ -185,7 +192,20 @@ export default async function handler(req: any, res: any) {
                     sources.push('video_asset_detected');
                 }
 
-                console.log(`📦 v6.0 Context size: ${lessonContext.length} chars | Sources: ${sources.join(', ')}`);
+                // Check for embedded PDFs that aren't in attachments
+                const embeddedPdfs = embeddedLinks.filter(u => u.toLowerCase().endsWith('.pdf'));
+                for (const pdfUrl of embeddedPdfs) {
+                    if (!sources.some(s => s.startsWith('pdf:'))) { // Avoid dupes
+                        const fileName = pdfUrl.split('/').pop() || 'embedded.pdf';
+                        const pdfText = await extractPdfText(pdfUrl, fileName);
+                        if (pdfText) {
+                            lessonContext += `\nEMBEDDED PDF CONTENT (${fileName}):\n${pdfText}\n`;
+                            sources.push(`pdf:${fileName}`);
+                        }
+                    }
+                }
+
+                console.log(`📦 v6.1 Context size: ${lessonContext.length} chars | Sources: ${sources.join(', ')}`);
             }
         } catch (err) {
             console.error('⚠️ Could not fetch lesson details:', err);

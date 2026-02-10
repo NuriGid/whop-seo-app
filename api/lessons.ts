@@ -97,17 +97,25 @@ export default async function handler(req: any, res: any) {
         console.log(`✅ Total unique lessons found: ${allLessons.length}`);
 
         // 5. Map to simplified format
+        const { extractPlainText } = require('./content-utils');
+
         const mappedLessons = allLessons
             .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
-            .map((lesson: any) => ({
-                id: lesson.id,
-                title: lesson.title || 'Untitled Lesson',
-                content: lesson.content || '',
-                order: lesson.order || 0,
-                lessonType: lesson.lesson_type || 'text',
-                visibility: lesson.visibility || 'visible',
-                chapterTitle: lesson.chapterTitle || ''
-            }));
+            .map((lesson: any) => {
+                const rawContent = lesson.content || '';
+                const previewText = extractPlainText(rawContent);
+
+                return {
+                    id: lesson.id,
+                    title: lesson.title || 'Untitled Lesson',
+                    content: previewText || 'No description',
+                    rawContent: rawContent, // Keep for AI
+                    order: lesson.order || 0,
+                    lessonType: lesson.lesson_type || 'text',
+                    visibility: lesson.visibility || 'visible',
+                    chapterTitle: lesson.chapterTitle || ''
+                };
+            });
 
         return res.status(200).json({
             lessons: mappedLessons,
