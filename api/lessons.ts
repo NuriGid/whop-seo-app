@@ -24,7 +24,7 @@ export default async function handler(req: any, res: any) {
 
     console.log(`📚 v6.0 Discovery: Fetching lessons for course: ${courseId}`);
 
-    const debug: any = { courseId, trials: [] };
+    const debug: any = { courseId, steps: [] };
 
     // Common Whop v5 patterns for lessons
     const patterns = [
@@ -48,7 +48,7 @@ export default async function handler(req: any, res: any) {
             });
 
             const text = await response.text();
-            debug.trials.push({ url, status: response.status, bodyPreview: text.substring(0, 100) });
+            debug.steps.push({ step: 'trial', url: url.split('?')[0], status: response.status, bodyPreview: text.substring(0, 60) });
 
             if (response.ok) {
                 const data = JSON.parse(text);
@@ -59,7 +59,7 @@ export default async function handler(req: any, res: any) {
                 }
             }
         } catch (err) {
-            debug.trials.push({ url, error: (err as Error).message });
+            debug.steps.push({ step: 'error', url: url.split('?')[0], error: (err as Error).message });
         }
     }
 
