@@ -48,20 +48,20 @@ export default async function handler(req: any, res: any) {
         const text = await response.text();
         console.log(`📦 Update Response (${response.status}): ${text.substring(0, 200)}`);
 
-        if (!response.ok) {
-            return res.status(response.status).json({
-                error: (data && data.message) || (data && data.error) || `Whop API error: ${response.status}`,
-                details: data
-            });
-        }
-
         let data: any = {};
         if (text) {
             try {
                 data = JSON.parse(text);
             } catch (e) {
-                console.warn("Could not parse Whop update response as JSON, but status was OK");
+                console.warn("Could not parse Whop update response as JSON");
             }
+        }
+
+        if (!response.ok) {
+            return res.status(response.status).json({
+                error: (data && data.message) || (data && data.error) || `Whop API error: ${response.status}`,
+                details: data
+            });
         }
 
         console.log(`✅ Lesson updated: ${lessonId}`);
