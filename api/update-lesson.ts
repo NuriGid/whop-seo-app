@@ -32,17 +32,31 @@ export default async function handler(req: any, res: any) {
         if (content) updatePayload.content = content;
         if (title) updatePayload.title = title;
 
-        const response = await fetch(
-            `https://api.whop.com/api/v5/course-lessons/${lessonId}`,
-            {
+        // Try underscore, No prefix pattern first (v5 Standard)
+        const primaryUrl = `https://api.whop.com/v5/course_lessons/${lessonId}`;
+        const fallbackUrl = `https://api.whop.com/api/v5/course-lessons/${lessonId}`;
+
+        let response = await fetch(primaryUrl, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(updatePayload)
+        });
+
+        // If 404, try fallback
+        if (response.status === 404) {
+            console.log(`⚠️ primaryUrl 404, trying fallback: ${fallbackUrl}`);
+            response = await fetch(fallbackUrl, {
                 method: 'PUT',
                 headers: {
                     'Authorization': `Bearer ${apiKey}`,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify(updatePayload)
-            }
-        );
+            });
+        }
 
         const text = await response.text();
         console.log(`📦 Update Response (${response.status}): ${text.substring(0, 200)}`);
