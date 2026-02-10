@@ -162,15 +162,13 @@ const LessonsPanel: React.FC<LessonsPanelProps> = ({ courseId, courseName, userN
     if (isLoading) {
         return (
             <div className="bg-gray-800/40 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-6 mt-6 text-center">
-                <div className="animate-pulse text-gray-400">Loading lessons...</div>
+                <div className="animate-pulse text-gray-400">📚 Loading lessons...</div>
             </div>
         );
     }
 
-    // Hide panel completely if no lessons or error
-    if (error || lessons.length === 0) {
-        return null;
-    }
+    // v6.0: ALWAYS show panel — never silently hide
+    // Previously returned null here, which made the panel invisible
 
     return (
         <div className="bg-gray-800/40 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-6 mt-6">
@@ -197,7 +195,8 @@ const LessonsPanel: React.FC<LessonsPanelProps> = ({ courseId, courseName, userN
 
             {error && (
                 <div className="bg-red-900/50 border border-red-700 rounded-lg p-3 mb-4 text-red-300 text-sm">
-                    {error}
+                    ⚠️ {error}
+                    <div className="text-red-400/60 text-xs mt-1">Course ID: {courseId}</div>
                 </div>
             )}
 
@@ -207,8 +206,8 @@ const LessonsPanel: React.FC<LessonsPanelProps> = ({ courseId, courseName, userN
                 </div>
             )}
 
-            {lessons.length === 0 ? (
-                <p className="text-gray-500 text-center py-4">No lessons found for this course.</p>
+            {!error && lessons.length === 0 ? (
+                <p className="text-gray-500 text-center py-4">No lessons found for this course. Make sure the course has chapters with lessons on Whop.</p>
             ) : (
                 <div className="space-y-3 max-h-80 overflow-y-auto">
                     {lessons.map((lesson, idx) => (
