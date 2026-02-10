@@ -47,11 +47,11 @@ export default async function handler(req: any, res: any) {
             });
         }
 
-        // PUT to Whop API v5
-        console.log(`📝 Updating course ${courseId} description...`);
+        // PATCH to Whop API v5
+        console.log(`📝 Updating course ${courseId} description via PATCH...`);
 
         const response = await fetch(`https://api.whop.com/api/v5/courses/${courseId}`, {
-            method: 'PUT',
+            method: 'PATCH',
             headers: {
                 'Authorization': `Bearer ${apiKey}`,
                 'Content-Type': 'application/json'

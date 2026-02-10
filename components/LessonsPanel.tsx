@@ -106,7 +106,10 @@ const LessonsPanel: React.FC<LessonsPanelProps> = ({ courseId, courseName, userN
                 let errorDetails = 'Update failed';
                 try {
                     const errData = await response.json();
-                    errorDetails = errData.details ? `${errData.error}: ${errData.details}` : (errData.error || errorDetails);
+                    const detailsStr = (errData.details && typeof errData.details === 'object')
+                        ? JSON.stringify(errData.details)
+                        : errData.details;
+                    errorDetails = detailsStr ? `${errData.error}: ${detailsStr}` : (errData.error || errorDetails);
                 } catch (e) {
                     errorDetails = `Error ${response.status}`;
                 }

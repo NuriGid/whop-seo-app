@@ -32,11 +32,11 @@ export default async function handler(req: any, res: any) {
         if (content) updatePayload.content = content;
         if (title) updatePayload.title = title;
 
-        const apiUrl = `https://api.whop.com/api/v1/course_lessons/${lessonId}`;
-        console.log(`✏️ Updating lesson via v1: ${apiUrl}`);
+        const apiUrl = `https://api.whop.com/api/v5/course-lessons/${lessonId}`;
+        console.log(`✏️ Updating lesson via v5: ${apiUrl}`);
 
         const response = await fetch(apiUrl, {
-            method: 'PUT',
+            method: 'PATCH',
             headers: {
                 'Authorization': `Bearer ${apiKey}`,
                 'Content-Type': 'application/json'

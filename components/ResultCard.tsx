@@ -103,7 +103,10 @@ const ResultCard: React.FC<ResultCardProps> = ({ result, courseId, companyId, on
         onWhopAction?.('update', true, '✅ Course description updated on Whop!');
         setTimeout(() => setSuccessAction(null), 3000);
       } else {
-        const errorMsg = data.details ? `${data.error}: ${data.details}` : data.error;
+        const detailsStr = (data.details && typeof data.details === 'object')
+          ? JSON.stringify(data.details)
+          : data.details;
+        const errorMsg = detailsStr ? `${data.error}: ${detailsStr}` : data.error;
         onWhopAction?.('update', false, `❌ Failed: ${errorMsg}`);
       }
     } catch (error: any) {
