@@ -102,7 +102,16 @@ const LessonsPanel: React.FC<LessonsPanelProps> = ({ courseId, courseName, userN
                 body: JSON.stringify({ lessonId, content })
             });
 
-            if (!response.ok) throw new Error('Update failed');
+            if (!response.ok) {
+                let errorDetails = 'Update failed';
+                try {
+                    const errData = await response.json();
+                    errorDetails = errData.details ? `${errData.error}: ${errData.details}` : (errData.error || errorDetails);
+                } catch (e) {
+                    errorDetails = `Error ${response.status}`;
+                }
+                throw new Error(errorDetails);
+            }
 
             setSuccessMsg(`✅ Lesson updated on Whop!`);
             setTimeout(() => setSuccessMsg(null), 3000);

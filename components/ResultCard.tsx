@@ -103,7 +103,8 @@ const ResultCard: React.FC<ResultCardProps> = ({ result, courseId, companyId, on
         onWhopAction?.('update', true, '✅ Course description updated on Whop!');
         setTimeout(() => setSuccessAction(null), 3000);
       } else {
-        onWhopAction?.('update', false, `❌ Failed: ${data.error}`);
+        const errorMsg = data.details ? `${data.error}: ${data.details}` : data.error;
+        onWhopAction?.('update', false, `❌ Failed: ${errorMsg}`);
       }
     } catch (error: any) {
       onWhopAction?.('update', false, `❌ Error: ${error.message}`);
@@ -134,7 +135,8 @@ const ResultCard: React.FC<ResultCardProps> = ({ result, courseId, companyId, on
         onWhopAction?.('announce', true, '✅ Announcement published on Whop!');
         setTimeout(() => setSuccessAction(null), 3000);
       } else {
-        onWhopAction?.('announce', false, `❌ Failed: ${data.error}`);
+        const errorMsg = data.details ? `${data.error}: ${JSON.stringify(data.details)}` : data.error;
+        onWhopAction?.('announce', false, `❌ Failed: ${errorMsg}`);
       }
     } catch (error: any) {
       onWhopAction?.('announce', false, `❌ Error: ${error.message}`);
