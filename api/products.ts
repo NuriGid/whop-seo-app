@@ -31,9 +31,9 @@ export default async function handler(req: any, res: any) {
         const companyId = req.headers['x-whop-company-id'];
         console.log(`🏢 Company ID: ${companyId || 'NOT FOUND'}`);
 
-        // 4. CALL WHOP API v5 (NEWER ENDPOINT!)
-        const apiUrl = `https://api.whop.com/api/v5/courses`;
-        console.log(`📡 Fetching v5: ${apiUrl}`);
+        // 4. CALL WHOP API v1
+        const apiUrl = `https://api.whop.com/api/v1/courses${companyId ? `?company_id=${companyId}` : ''}`;
+        console.log(`📡 Fetching v1: ${apiUrl}`);
 
         const response = await fetch(apiUrl, {
             method: 'GET',
@@ -46,20 +46,11 @@ export default async function handler(req: any, res: any) {
         let courses = [];
         if (response.ok) {
             const data = await response.json();
-            courses = data.data || [];
-            console.log(`✅ v5 found ${courses.length} courses`);
+            courses = data.data || data || [];
+            console.log(`✅ v1 found ${courses.length} courses`);
         } else {
-            console.warn(`⚠️ v5 failed (${response.status}), falling back to v1...`);
-            const v1Url = `https://api.whop.com/api/v1/courses${companyId ? `?company_id=${companyId}` : ''}`;
-            const v1Res = await fetch(v1Url, {
-                method: 'GET',
-                headers: { 'Authorization': `Bearer ${apiKey}` }
-            });
-            if (v1Res.ok) {
-                const v1Data = await v1Res.json();
-                courses = v1Data.data || v1Data || [];
-                console.log(`✅ v1 fallback found ${courses.length} courses`);
-            }
+            console.error(`❌ v1 failed (${response.status})`);
+            return res.status(response.status).json({ error: 'Whop API v1 failed' });
         }
 
         // 5. MAP COURSES

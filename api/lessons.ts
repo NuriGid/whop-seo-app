@@ -1,8 +1,8 @@
 /**
- * CourseRocket v6.0 - Lessons API (Auto-Discovery Mode)
+ * CourseRocket v6.0 - Lessons API (v1 Standard)
  * 
  * Lists all lessons for a given course.
- * Automatically tries different URL patterns to find the correct v5 endpoint.
+ * Uses Whop v1 API with underscores.
  */
 
 export default async function handler(req: any, res: any) {
@@ -22,113 +22,102 @@ export default async function handler(req: any, res: any) {
     const courseId = req.query.courseId;
     if (!courseId) return res.status(400).json({ error: 'courseId query parameter required' });
 
-    console.log(`📚 v6.0 Discovery: Fetching lessons for course: ${courseId}`);
+    console.log(`📚 v6.0 Std: Fetching lessons for course: ${courseId}`);
 
     const debug: any = { courseId, steps: [] };
 
-    // Common Whop v5 patterns for lessons
-    const patterns = [
-        `https://api.whop.com/v5/course_lessons?course_id=${courseId}&first=100`, // Underscore, No prefix
-        `https://api.whop.com/api/v5/course_lessons?course_id=${courseId}&first=100`, // Underscore, With /api/
-        `https://api.whop.com/v5/course-lessons?course_id=${courseId}&first=100`, // Hyphen, No prefix
-        `https://api.whop.com/api/v5/course-lessons?course_id=${courseId}&first=100`, // Hyphen, With /api/
-    ];
+    try {
+        // 1. Fetch Lessons directly (CORRECT v1 URL)
+        const lessonsUrl = `https://api.whop.com/api/v1/course_lessons?course_id=${courseId}&first=100`;
+        debug.steps.push({ step: 'lessons_v1', url: lessonsUrl });
 
-    let foundData = null;
-
-    for (const url of patterns) {
-        try {
-            console.log(`📡 Trying URL: ${url}`);
-            const response = await fetch(url, {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${apiKey}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            const text = await response.text();
-            debug.steps.push({ step: 'trial', url: url.split('?')[0], status: response.status, bodyPreview: text.substring(0, 60) });
-
-            if (response.ok) {
-                const data = JSON.parse(text);
-                if (data.data && Array.isArray(data.data) && data.data.length > 0) {
-                    console.log(`✅ Success with URL: ${url}`);
-                    foundData = data.data;
-                    break; // Found the one!
-                }
+        const lessonsRes = await fetch(lessonsUrl, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json'
             }
-        } catch (err) {
-            debug.steps.push({ step: 'error', url: url.split('?')[0], error: (err as Error).message });
+        });
+
+        const lessonsRaw = await lessonsRes.text();
+        debug.steps.push({ step: 'lessons_response', status: lessonsRes.status });
+
+        let directLessons: any[] = [];
+        if (lessonsRes.ok) {
+            const lessonsData = JSON.parse(lessonsRaw);
+            directLessons = lessonsData.data || [];
         }
-    }
+        console.log(`📦 Found ${directLessons.length} direct lessons`);
 
-    // Try Chapter Logic if direct lessons failed but chapters might work
-    let chapterLessons: any[] = [];
-    if (!foundData) {
-        const chapterPatterns = [
-            `https://api.whop.com/v5/course_chapters?course_id=${courseId}&first=50`,
-            `https://api.whop.com/api/v5/course_chapters?course_id=${courseId}&first=50`,
-            `https://api.whop.com/v5/course-chapters?course_id=${courseId}&first=50`,
-            `https://api.whop.com/api/v5/course-chapters?course_id=${courseId}&first=50`,
-        ];
+        // 2. Fetch Chapters (lessons might be nested in some cases or we need chapter info)
+        const chaptersUrl = `https://api.whop.com/api/v1/course_chapters?course_id=${courseId}&first=50`;
+        debug.steps.push({ step: 'chapters_v1', url: chaptersUrl });
 
-        for (const url of chapterPatterns) {
-            try {
-                console.log(`📡 Trying Chapters URL: ${url}`);
-                const response = await fetch(url, {
-                    method: 'GET',
-                    headers: { 'Authorization': `Bearer ${apiKey}` }
+        const chaptersRes = await fetch(chaptersUrl, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const chaptersRaw = await chaptersRes.text();
+        debug.steps.push({ step: 'chapters_response', status: chaptersRes.status });
+
+        let chapters: any[] = [];
+        if (chaptersRes.ok) {
+            const chaptersData = JSON.parse(chaptersRaw);
+            chapters = chaptersData.data || [];
+        }
+        console.log(`📦 Found ${chapters.length} chapters`);
+
+        // 3. Extract lessons from chapters (some lessons might only appear here)
+        const chapterLessons: any[] = [];
+        chapters.forEach((chapter: any) => {
+            if (chapter.lessons && Array.isArray(chapter.lessons)) {
+                chapter.lessons.forEach((lesson: any) => {
+                    chapterLessons.push({
+                        ...lesson,
+                        chapterTitle: chapter.title
+                    });
                 });
+            }
+        });
 
-                if (response.ok) {
-                    const data = await response.json();
-                    const chapters = data.data || [];
-                    if (chapters.length > 0) {
-                        debug.chapters_success_url = url;
-                        // For each chapter, try to find lessons
-                        for (const chapter of chapters) {
-                            // Try underscore vs hyphen for chapter lessons
-                            const clUrl = url.includes('course_chapters')
-                                ? url.replace('course_chapters', 'course_lessons').split('?')[0] + `?chapter_id=${chapter.id}&first=50`
-                                : url.replace('course-chapters', 'course-lessons').split('?')[0] + `?chapter_id=${chapter.id}&first=50`;
+        // 4. Merge and deduplicate
+        const allLessonsMap = new Map();
+        directLessons.forEach((l: any) => allLessonsMap.set(l.id, l));
+        chapterLessons.forEach((l: any) => {
+            if (!allLessonsMap.has(l.id)) {
+                allLessonsMap.set(l.id, l);
+            }
+        });
 
-                            const clRes = await fetch(clUrl, {
-                                method: 'GET',
-                                headers: { 'Authorization': `Bearer ${apiKey}` }
-                            });
-                            if (clRes.ok) {
-                                const clData = await clRes.json();
-                                (clData.data || []).forEach((l: any) => {
-                                    chapterLessons.push({ ...l, chapterTitle: chapter.title });
-                                });
-                            }
-                        }
-                        if (chapterLessons.length > 0) break;
-                    }
-                }
-            } catch (e) { }
-        }
+        const allLessons = Array.from(allLessonsMap.values());
+        console.log(`✅ Total unique lessons found: ${allLessons.length}`);
+
+        // 5. Map to simplified format
+        const mappedLessons = allLessons
+            .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
+            .map((lesson: any) => ({
+                id: lesson.id,
+                title: lesson.title || 'Untitled Lesson',
+                content: lesson.content || '',
+                order: lesson.order || 0,
+                lessonType: lesson.lesson_type || 'text',
+                visibility: lesson.visibility || 'visible',
+                chapterTitle: lesson.chapterTitle || ''
+            }));
+
+        return res.status(200).json({
+            lessons: mappedLessons,
+            count: mappedLessons.length,
+            courseId,
+            debug
+        });
+
+    } catch (error: any) {
+        console.error('❌ Lessons API Error:', error);
+        return res.status(500).json({ error: error.message, debug });
     }
-
-    const finalLessons = foundData || chapterLessons;
-
-    const mappedLessons = finalLessons
-        .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
-        .map((lesson: any) => ({
-            id: lesson.id,
-            title: lesson.title || 'Untitled Lesson',
-            content: lesson.content || '',
-            order: lesson.order || 0,
-            lessonType: lesson.lesson_type || 'text',
-            visibility: lesson.visibility || 'visible',
-            chapterTitle: lesson.chapterTitle || ''
-        }));
-
-    return res.status(200).json({
-        lessons: mappedLessons,
-        count: mappedLessons.length,
-        courseId,
-        debug
-    });
 }

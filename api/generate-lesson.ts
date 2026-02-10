@@ -115,7 +115,7 @@ export default async function handler(req: any, res: any) {
     if (lessonId && apiKey) {
         console.log(`🔍 v6.0 Deep Analyzing lesson: ${lessonId}`);
         try {
-            const lessonRes = await fetch(`https://api.whop.com/api/v5/course-lessons/${lessonId}`, {
+            const lessonRes = await fetch(`https://api.whop.com/api/v1/course_lessons/${lessonId}`, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${apiKey}`,
@@ -125,6 +125,14 @@ export default async function handler(req: any, res: any) {
 
             if (lessonRes.ok) {
                 const lessonData = await lessonRes.json();
+
+                // v6.0 Metadata: Extract attachment names as hammadde (raw materials)
+                if (lessonData.attachments && Array.isArray(lessonData.attachments)) {
+                    const fileNames = lessonData.attachments.map((a: any) => a.filename).filter(Boolean).join(', ');
+                    if (fileNames) {
+                        lessonContext += `\nRAW MATERIALS (Files Attached): ${fileNames}\n`;
+                    }
+                }
 
                 // ── A: Extract text content ──
                 if (lessonData.content) {

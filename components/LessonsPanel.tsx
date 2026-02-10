@@ -45,12 +45,8 @@ const LessonsPanel: React.FC<LessonsPanelProps> = ({ courseId, courseName, userN
 
                 // v6.0 Debug: If no lessons, show what the API found
                 if ((data.lessons || []).length === 0 && data.debug) {
-                    console.log('🔍 Debug info:', JSON.stringify(data.debug, null, 2));
-                    const debugSteps = (data.debug?.steps || []).map((s: any) => {
-                        const detail = s.status || (s.bodyPreview ? s.bodyPreview.substring(0, 80) : '') || s.reason || '';
-                        return s.step + ': ' + detail;
-                    }).join(' → ');
-                    setError('API returned 0 lessons. Debug: ' + debugSteps);
+                    console.log('🔍 Debug info:', data.debug);
+                    setError('No lessons found. (API Check: ' + (data.debug.steps?.[0]?.status || '404') + ')');
                 }
             } catch (err) {
                 setError(err instanceof Error ? err.message : 'Failed to load lessons');
