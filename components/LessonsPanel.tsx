@@ -51,7 +51,6 @@ const LessonsPanel: React.FC<LessonsPanelProps> = ({ courseId, courseName, userN
                 // v6.0 Debug: If no lessons, show what the API found
                 if ((data.lessons || []).length === 0 && data.debug) {
                     console.log('🔍 Debug info:', data.debug);
-                    setError('No lessons found. (API Check: ' + (data.debug.steps?.[0]?.status || '404') + ')');
                 }
             } catch (err) {
                 setError(err instanceof Error ? err.message : 'Failed to load lessons');
@@ -287,6 +286,11 @@ const LessonsPanel: React.FC<LessonsPanelProps> = ({ courseId, courseName, userN
                             {contentSources.includes('youtube_transcript') && (
                                 <span className="text-[10px] bg-red-900/50 text-red-300 px-2 py-0.5 rounded-full border border-red-700/30 font-medium">
                                     🎬 Transcript
+                                </span>
+                            )}
+                            {contentSources.includes('youtube_transcript_unavailable') && (
+                                <span className="text-[10px] bg-orange-900/50 text-orange-300 px-2 py-0.5 rounded-full border border-orange-700/30 font-medium">
+                                    🎬 Transcript Unavailable
                                 </span>
                             )}
                             {contentSources.includes('lesson_text') && (

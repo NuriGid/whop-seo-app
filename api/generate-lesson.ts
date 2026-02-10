@@ -148,18 +148,39 @@ export default async function handler(req: any, res: any) {
                     sources.push('lesson_text');
                 }
 
-                // ── C: Extract YouTube/Loom transcript (Aggressive) ──
-                const videoUrl = allLinks.find(u =>
-                    u.includes('youtube.com') ||
-                    u.includes('youtu.be') ||
-                    u.includes('loom.com')
-                );
+                // ── C: YouTube/Loom transcript (v6.5 Universal Scavenger) ──
+                let videoUrl = '';
+
+                // 1. Check explicit fields (Multimedia preference)
+                if (lessonData.multimedia?.url) {
+                    videoUrl = lessonData.multimedia.url;
+                } else if (lessonData.video_url) {
+                    videoUrl = lessonData.video_url;
+                } else if (lessonData.video?.url) {
+                    videoUrl = lessonData.video.url;
+                } else if (lessonData.multimedia_url) {
+                    videoUrl = lessonData.multimedia_url;
+                }
+
+                // 2. Fallback to deep scan if explicit fields are empty
+                if (!videoUrl) {
+                    videoUrl = allLinks.find(u =>
+                        u.includes('youtube.com') ||
+                        u.includes('youtu.be') ||
+                        u.includes('loom.com')
+                    ) || '';
+                }
 
                 if (videoUrl) {
+                    console.log(`🎬 Found candidate video URL: ${videoUrl}`);
                     const transcript = await fetchYouTubeTranscript(videoUrl);
                     if (transcript) {
                         lessonContext += `\nVIDEO TRANSCRIPT:\n${transcript}\n`;
                         sources.push('youtube_transcript');
+                    } else {
+                        // v6.5 Diagnosis: Found the video, but couldn't get text
+                        sources.push('youtube_transcript_unavailable');
+                        lessonContext += `\nVIDEO LESSON: This lesson contains a video (${videoUrl}).\n`;
                     }
                 } else if (lessonData.video_asset || lessonData.multimedia) {
                     lessonContext += `\nVIDEO LESSON: This lesson contains a video/multimedia asset.\n`;
@@ -179,7 +200,7 @@ export default async function handler(req: any, res: any) {
                     }
                 }
 
-                console.log(`📦 v6.3 Context size: ${lessonContext.length} chars | Sources: ${sources.join(', ')}`);
+                console.log(`📦 v6.5 Context size: ${lessonContext.length} chars | Sources: ${sources.join(', ')}`);
             }
         } catch (err) {
             console.error('⚠️ Could not fetch lesson details:', err);
