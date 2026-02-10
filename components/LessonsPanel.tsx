@@ -191,17 +191,20 @@ const LessonsPanel: React.FC<LessonsPanelProps> = ({ courseId, courseName, userN
                 </h3>
 
                 {lessons.length > 0 && (
-                    <button
-                        onClick={bulkGenerateAll}
-                        disabled={isBulkGenerating}
-                        className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 disabled:opacity-50 text-white text-sm font-medium py-2 px-4 rounded-lg transition-all"
-                    >
-                        {isBulkGenerating ? (
-                            <span>Analyzing... {bulkProgress.current}/{bulkProgress.total}</span>
-                        ) : (
-                            <span>⚡ Fill All Lessons</span>
-                        )}
-                    </button>
+                    <div className="flex flex-col items-end gap-1">
+                        <button
+                            onClick={bulkGenerateAll}
+                            disabled={isBulkGenerating}
+                            className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 disabled:opacity-50 text-white text-sm font-medium py-2 px-4 rounded-lg transition-all shadow-lg shadow-green-900/20"
+                        >
+                            {isBulkGenerating ? (
+                                <span>Analyzing... {bulkProgress.current}/{bulkProgress.total}</span>
+                            ) : (
+                                <span>⚡ Fill All Lessons</span>
+                            )}
+                        </button>
+                        <span className="text-[10px] text-gray-500 italic">Updates Whop Lesson Content/Description</span>
+                    </div>
                 )}
             </div>
 
@@ -219,7 +222,11 @@ const LessonsPanel: React.FC<LessonsPanelProps> = ({ courseId, courseName, userN
             )}
 
             {!error && lessons.length === 0 ? (
-                <p className="text-gray-500 text-center py-4">No lessons found for this course. Make sure the course has chapters with lessons on Whop.</p>
+                <div className="text-center py-8 border-2 border-dashed border-gray-700/50 rounded-xl">
+                    <div className="text-3xl mb-2">📭</div>
+                    <p className="text-gray-400 font-medium">No active lessons found for this course.</p>
+                    <p className="text-gray-600 text-xs mt-1">Empty placeholder lessons are hidden.</p>
+                </div>
             ) : (
                 <div className="space-y-3 max-h-80 overflow-y-auto">
                     {lessons.map((lesson, idx) => (

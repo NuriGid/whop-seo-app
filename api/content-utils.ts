@@ -69,9 +69,36 @@ export function extractLinksFromContent(content: any): string[] {
     try {
         const parsed = typeof content === 'string' ? JSON.parse(content) : content;
         traverse(parsed);
-    } catch (e) {
-        // Fallback to just regex if not valid JSON
-    }
+    } catch (e) { }
 
     return Array.from(new Set([...matches, ...specificLinks]));
+}
+
+/**
+ * Recursively scans an object for media links (YouTube, Loom, PDF)
+ */
+export function deepSearchUrls(obj: any): string[] {
+    const urls: string[] = [];
+    const urlRegex = /https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/|loom\.com\/share\/|[^\s"'<>]+?\.pdf)[^\s"'<>]+/gi;
+
+    const scan = (item: any) => {
+        if (!item) return;
+
+        if (typeof item === 'string') {
+            const matches = item.match(urlRegex);
+            if (matches) urls.push(...matches);
+
+            // If it's a JSON string, try to parse and scan it
+            if (item.trim().startsWith('{')) {
+                try { scan(JSON.parse(item)); } catch (e) { }
+            }
+        } else if (Array.isArray(item)) {
+            item.forEach(scan);
+        } else if (typeof item === 'object') {
+            Object.values(item).forEach(scan);
+        }
+    };
+
+    scan(obj);
+    return Array.from(new Set(urls));
 }

@@ -15,7 +15,7 @@
  */
 
 const GROQ_API_KEY = (process.env.GROQ_API_KEY || '').trim();
-import { extractPlainText, extractLinksFromContent } from './content-utils.js';
+import { extractPlainText, extractLinksFromContent, deepSearchUrls } from './content-utils.js';
 
 // ─── PDF TEXT EXTRACTION ───────────────────────────────────────────
 async function extractPdfText(url: string, filename: string): Promise<string> {
@@ -127,6 +127,12 @@ export default async function handler(req: any, res: any) {
             if (lessonRes.ok) {
                 const lessonData = await lessonRes.json();
 
+                // v6.3: Aggressive Deep Scan for ALL URLs in lessonData
+                const allLinks = deepSearchUrls(lessonData);
+                if (allLinks.length > 0) {
+                    console.log(`🔍 v6.3 Deep Scan found ${allLinks.length} URLs:`, allLinks);
+                }
+
                 // v6.0 Metadata: Extract attachment names as hammadde (raw materials)
                 if (lessonData.attachments && Array.isArray(lessonData.attachments)) {
                     const fileNames = lessonData.attachments.map((a: any) => a.filename).filter(Boolean).join(', ');
@@ -142,50 +148,12 @@ export default async function handler(req: any, res: any) {
                     sources.push('lesson_text');
                 }
 
-                // ── B: Extract PDF text from attachments ──
-                if (lessonData.attachments && Array.isArray(lessonData.attachments) && lessonData.attachments.length > 0) {
-                    for (const att of lessonData.attachments) {
-                        const isPdf = att.content_type === 'application/pdf' ||
-                            (att.filename && att.filename.toLowerCase().endsWith('.pdf'));
-
-                        if (isPdf && att.url) {
-                            const pdfText = await extractPdfText(att.url, att.filename || 'unknown.pdf');
-                            if (pdfText) {
-                                lessonContext += `\nPDF CONTENT (${att.filename}):\n${pdfText}\n`;
-                                sources.push(`pdf:${att.filename}`);
-                            }
-                        } else {
-                            // Non-PDF attachment — at least log the filename
-                            lessonContext += `\nATTACHMENT: ${att.filename} (${att.content_type || 'unknown type'})\n`;
-                            sources.push(`file:${att.filename}`);
-                        }
-                    }
-                }
-
-                // ── C: Deep Extract Links from JSON (Ghosts Fix) ──
-                const embeddedLinks = extractLinksFromContent(lessonData.content);
-                if (embeddedLinks.length > 0) {
-                    console.log(`🔗 Found ${embeddedLinks.length} embedded links in content`);
-                }
-
-                // ── D: Extract YouTube/Loom transcript ──
-                // Check multiple fields + embedded links (v6.2 Multimedia Support)
-                let videoUrl = '';
-
-                if (lessonData.video_url) {
-                    videoUrl = lessonData.video_url;
-                } else if (lessonData.video?.url) {
-                    videoUrl = lessonData.video.url;
-                } else if (lessonData.multimedia?.url) {
-                    videoUrl = lessonData.multimedia.url;
-                } else if (embeddedLinks.length > 0) {
-                    // Look for video links in the extracted URLs
-                    videoUrl = embeddedLinks.find(u =>
-                        u.includes('youtube.com') ||
-                        u.includes('youtu.be') ||
-                        u.includes('loom.com')
-                    ) || '';
-                }
+                // ── C: Extract YouTube/Loom transcript (Aggressive) ──
+                const videoUrl = allLinks.find(u =>
+                    u.includes('youtube.com') ||
+                    u.includes('youtu.be') ||
+                    u.includes('loom.com')
+                );
 
                 if (videoUrl) {
                     const transcript = await fetchYouTubeTranscript(videoUrl);
@@ -198,10 +166,10 @@ export default async function handler(req: any, res: any) {
                     sources.push('video_asset_detected');
                 }
 
-                // Check for embedded PDFs that aren't in attachments
-                const embeddedPdfs = embeddedLinks.filter(u => u.toLowerCase().endsWith('.pdf'));
-                for (const pdfUrl of embeddedPdfs) {
-                    if (!sources.some(s => s.startsWith('pdf:'))) { // Avoid dupes
+                // Check for PDFs found in deep scan that weren't in attachments
+                const deepPdfs = allLinks.filter(u => u.toLowerCase().endsWith('.pdf'));
+                for (const pdfUrl of deepPdfs) {
+                    if (!sources.some(s => s.startsWith('pdf:'))) {
                         const fileName = pdfUrl.split('/').pop() || 'embedded.pdf';
                         const pdfText = await extractPdfText(pdfUrl, fileName);
                         if (pdfText) {
@@ -211,7 +179,7 @@ export default async function handler(req: any, res: any) {
                     }
                 }
 
-                console.log(`📦 v6.1 Context size: ${lessonContext.length} chars | Sources: ${sources.join(', ')}`);
+                console.log(`📦 v6.3 Context size: ${lessonContext.length} chars | Sources: ${sources.join(', ')}`);
             }
         } catch (err) {
             console.error('⚠️ Could not fetch lesson details:', err);

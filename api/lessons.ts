@@ -105,6 +105,10 @@ export default async function handler(req: any, res: any) {
                 const rawContent = lesson.content || '';
                 const previewText = extractPlainText(rawContent);
 
+                // v6.3: Filter out Whop's default placeholder "Lesson 1" if it's empty
+                const isPlaceholder = (lesson.title === 'Lesson 1' || !lesson.title) && (!previewText || previewText === 'No description');
+                if (isPlaceholder) return null;
+
                 return {
                     id: lesson.id,
                     title: lesson.title || 'Untitled Lesson',
@@ -115,7 +119,8 @@ export default async function handler(req: any, res: any) {
                     visibility: lesson.visibility || 'visible',
                     chapterTitle: lesson.chapterTitle || ''
                 };
-            });
+            })
+            .filter(Boolean);
 
         return res.status(200).json({
             lessons: mappedLessons,
