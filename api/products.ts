@@ -31,9 +31,9 @@ export default async function handler(req: any, res: any) {
         const companyId = req.headers['x-whop-company-id'];
         console.log(`🏢 Company ID: ${companyId || 'NOT FOUND'}`);
 
-        // 4. CALL WHOP API v1 (CORRECT ENDPOINT!)
-        const apiUrl = `https://api.whop.com/api/v1/courses${companyId ? `?company_id=${companyId}` : ''}`;
-        console.log(`📡 Fetching: ${apiUrl}`);
+        // 4. CALL WHOP API v5 (NEWER ENDPOINT!)
+        const apiUrl = `https://api.whop.com/api/v5/courses`;
+        console.log(`📡 Fetching v5: ${apiUrl}`);
 
         const response = await fetch(apiUrl, {
             method: 'GET',
@@ -43,19 +43,24 @@ export default async function handler(req: any, res: any) {
             }
         });
 
-        const responseText = await response.text();
-        console.log(`📦 Response (${response.status}): ${responseText.substring(0, 300)}`);
-
-        if (!response.ok) {
-            console.error(`❌ Whop API Error (${response.status}):`, responseText);
-            return res.status(response.status).json({
-                error: `Whop API error: ${response.status}`,
-                details: responseText.substring(0, 200)
+        let courses = [];
+        if (response.ok) {
+            const data = await response.json();
+            courses = data.data || [];
+            console.log(`✅ v5 found ${courses.length} courses`);
+        } else {
+            console.warn(`⚠️ v5 failed (${response.status}), falling back to v1...`);
+            const v1Url = `https://api.whop.com/api/v1/courses${companyId ? `?company_id=${companyId}` : ''}`;
+            const v1Res = await fetch(v1Url, {
+                method: 'GET',
+                headers: { 'Authorization': `Bearer ${apiKey}` }
             });
+            if (v1Res.ok) {
+                const v1Data = await v1Res.json();
+                courses = v1Data.data || v1Data || [];
+                console.log(`✅ v1 fallback found ${courses.length} courses`);
+            }
         }
-
-        const data = JSON.parse(responseText);
-        const courses = data.data || data || [];
 
         // 5. MAP COURSES
         const mappedCourses = Array.isArray(courses) ? courses.map((course: any) => ({
@@ -67,7 +72,7 @@ export default async function handler(req: any, res: any) {
             tagline: course.tagline
         })) : [];
 
-        console.log(`✅ Returning ${mappedCourses.length} courses`);
+        console.log(`✅ Returning ${mappedCourses.length} mapped courses`);
         return res.status(200).json(mappedCourses);
 
     } catch (error: any) {

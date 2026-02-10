@@ -28,6 +28,9 @@ import productsHandler from './api/products';
 import plansHandler from './api/plans';
 import paymentsHandler from './api/payments';
 import paymentFeesHandler from './api/payment_fees';
+import lessonsHandler from './api/lessons';
+import generateLessonHandler from './api/generate-lesson';
+import updateLessonHandler from './api/update-lesson';
 
 // API Route: Get Products
 app.get('/api/products', (req, res) => productsHandler(req, res));
@@ -40,6 +43,15 @@ app.get('/api/payments', (req, res) => paymentsHandler(req, res));
 
 // API Route: Get Payment Fees
 app.get('/api/payments/:id/fees', (req, res) => paymentFeesHandler(req, res));
+
+// API Route: Lessons (Phase 2A/v6.0)
+app.get('/api/lessons', (req, res) => lessonsHandler(req, res));
+
+// API Route: Generate Lesson Description
+app.post('/api/generate-lesson', (req, res) => generateLessonHandler(req, res));
+
+// API Route: Update Lesson on Whop
+app.put('/api/update-lesson', (req, res) => updateLessonHandler(req, res));
 
 // API Route: Analyze Content
 app.post('/api/analyze', async (req, res) => {
