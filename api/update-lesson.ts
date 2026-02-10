@@ -50,8 +50,8 @@ export default async function handler(req: any, res: any) {
 
         if (!response.ok) {
             return res.status(response.status).json({
-                error: `Whop API error: ${response.status}`,
-                details: text.substring(0, 200)
+                error: (data && data.message) || (data && data.error) || `Whop API error: ${response.status}`,
+                details: data
             });
         }
 
