@@ -28,8 +28,9 @@ export default async function handler(req: any, res: any) {
     console.log(`📚 Fetching lessons for course: ${courseId}`);
 
     try {
-        const response = await fetch(
-            `https://api.whop.com/api/v5/course-lessons?course_id=${courseId}&first=50`,
+        // 1. Fetch Lessons directly
+        const lessonsRes = await fetch(
+            `https://api.whop.com/api/v5/course-lessons?course_id=${courseId}&first=100`,
             {
                 method: 'GET',
                 headers: {
@@ -39,30 +40,72 @@ export default async function handler(req: any, res: any) {
             }
         );
 
-        const text = await response.text();
-        console.log(`📦 Lessons API Response (${response.status}): ${text.substring(0, 200)}`);
+        const lessonsData = lessonsRes.ok ? await lessonsRes.json() : { data: [] };
+        const directLessons = lessonsData.data || [];
+        console.log(`📦 Found ${directLessons.length} direct lessons`);
 
-        if (!response.ok) {
-            return res.status(response.status).json({
-                error: `Whop API error: ${response.status}`,
-                details: text.substring(0, 200)
-            });
-        }
+        // 2. Fetch Chapters (lessons might be nested here)
+        const chaptersRes = await fetch(
+            `https://api.whop.com/api/v5/course-chapters?course_id=${courseId}&first=50`,
+            {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Content-Type': 'application/json'
+                }
+            }
+        );
 
-        const data = JSON.parse(text);
-        const lessons = data.data || [];
+        const chaptersData = chaptersRes.ok ? await chaptersRes.json() : { data: [] };
+        const chapters = chaptersData.data || [];
+        console.log(`📦 Found ${chapters.length} chapters`);
 
-        console.log(`✅ Found ${lessons.length} lessons`);
+        // 3. Extract lessons from chapters
+        const chapterLessons: any[] = [];
+        chapters.forEach((chapter: any) => {
+            if (chapter.lessons && Array.isArray(chapter.lessons)) {
+                chapter.lessons.forEach((lesson: any) => {
+                    chapterLessons.push({
+                        ...lesson,
+                        chapterTitle: chapter.title
+                    });
+                });
+            }
+        });
+        console.log(`📦 Found ${chapterLessons.length} lessons inside chapters`);
 
-        // Map to simplified format
-        const mappedLessons = lessons.map((lesson: any) => ({
-            id: lesson.id,
-            title: lesson.title || 'Untitled Lesson',
-            content: lesson.content || '',
-            order: lesson.order || 0,
-            lessonType: lesson.lesson_type || 'text',
-            visibility: lesson.visibility || 'visible'
-        }));
+        // 4. Merge and Deduplicate
+        const allLessonsMap = new Map();
+
+        // Add direct lessons first
+        directLessons.forEach((l: any) => allLessonsMap.set(l.id, l));
+
+        // Add chapter lessons (might have more info or reveal missing ones)
+        chapterLessons.forEach((l: any) => {
+            if (!allLessonsMap.has(l.id)) {
+                allLessonsMap.set(l.id, l);
+            } else {
+                // Enrich existing lesson with chapter info
+                const existing = allLessonsMap.get(l.id);
+                allLessonsMap.set(l.id, { ...existing, ...l });
+            }
+        });
+
+        const allLessons = Array.from(allLessonsMap.values());
+        console.log(`✅ Total unique lessons found: ${allLessons.length}`);
+
+        // 5. Map to simplified format
+        const mappedLessons = allLessons
+            .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
+            .map((lesson: any) => ({
+                id: lesson.id,
+                title: lesson.title || 'Untitled Lesson',
+                content: lesson.content || '',
+                order: lesson.order || 0,
+                lessonType: lesson.lesson_type || 'text',
+                visibility: lesson.visibility || 'visible',
+                chapterTitle: lesson.chapterTitle || ''
+            }));
 
         return res.status(200).json({
             lessons: mappedLessons,
