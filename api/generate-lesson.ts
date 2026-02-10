@@ -15,7 +15,7 @@
  */
 
 const GROQ_API_KEY = (process.env.GROQ_API_KEY || '').trim();
-import { extractPlainText, extractLinksFromContent } from './content-utils';
+import { extractPlainText, extractLinksFromContent } from './content-utils.js';
 
 // ─── PDF TEXT EXTRACTION ───────────────────────────────────────────
 async function extractPdfText(url: string, filename: string): Promise<string> {

@@ -4,7 +4,7 @@
  * Lists all lessons for a given course.
  * Uses Whop v1 API with underscores.
  */
-import { extractPlainText } from './content-utils';
+import { extractPlainText } from './content-utils.js';
 
 export default async function handler(req: any, res: any) {
     // CORS
