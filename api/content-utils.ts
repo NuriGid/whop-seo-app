@@ -103,3 +103,29 @@ export function deepSearchUrls(obj: any): string[] {
     scan(obj);
     return Array.from(new Set(urls));
 }
+
+/**
+ * Searches and returns ANY string value in an object that contains a keyword.
+ * Used for investigating where Whop hides data.
+ */
+export function forensicSearch(obj: any, keyword: string): string[] {
+    const findings: string[] = [];
+    const lowerKeyword = keyword.toLowerCase();
+
+    const scan = (item: any) => {
+        if (!item) return;
+
+        if (typeof item === 'string') {
+            if (item.toLowerCase().includes(lowerKeyword)) {
+                findings.push(item);
+            }
+        } else if (Array.isArray(item)) {
+            item.forEach(scan);
+        } else if (typeof item === 'object') {
+            Object.values(item).forEach(scan);
+        }
+    };
+
+    scan(obj);
+    return Array.from(new Set(findings));
+}

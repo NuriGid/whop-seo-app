@@ -15,7 +15,7 @@
  */
 
 const GROQ_API_KEY = (process.env.GROQ_API_KEY || '').trim();
-import { extractPlainText, extractLinksFromContent, deepSearchUrls } from './content-utils.js';
+import { extractPlainText, extractLinksFromContent, deepSearchUrls, forensicSearch } from './content-utils.js';
 
 // ─── PDF TEXT EXTRACTION ───────────────────────────────────────────
 async function extractPdfText(url: string, filename: string): Promise<string> {
@@ -201,6 +201,18 @@ export default async function handler(req: any, res: any) {
                 }
 
                 console.log(`📦 v6.5 Context size: ${lessonContext.length} chars | Sources: ${sources.join(', ')}`);
+
+                // ── D: v6.6 Forensic Reporting ──
+                const keys = Object.keys(lessonData).join(', ');
+                sources.push(`diagnostic:keys:[${keys}]`);
+
+                if (!sources.includes('youtube_transcript')) {
+                    const forensicFindings = forensicSearch(lessonData, 'youtube');
+                    if (forensicFindings.length > 0) {
+                        console.log(`🕵️ Forensic hunt found:`, forensicFindings);
+                        sources.push(`diagnostic:found:[${forensicFindings[0].substring(0, 30)}]`);
+                    }
+                }
             }
         } catch (err) {
             console.error('⚠️ Could not fetch lesson details:', err);
