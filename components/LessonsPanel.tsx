@@ -283,24 +283,9 @@ const LessonsPanel: React.FC<LessonsPanelProps> = ({ courseId, courseName, userN
                                     📄 PDF Read
                                 </span>
                             )}
-                            {contentSources.includes('youtube_transcript') && (
-                                <span className="text-[10px] bg-red-900/50 text-red-300 px-2 py-0.5 rounded-full border border-red-700/30 font-medium">
-                                    🎬 Transcript
-                                </span>
-                            )}
-                            {contentSources.includes('youtube_transcript_unavailable') && (
-                                <span className="text-[10px] bg-orange-900/50 text-orange-300 px-2 py-0.5 rounded-full border border-orange-700/30 font-medium">
-                                    🎬 Transcript Unavailable
-                                </span>
-                            )}
                             {contentSources.includes('lesson_text') && (
                                 <span className="text-[10px] bg-green-900/50 text-green-300 px-2 py-0.5 rounded-full border border-green-700/30 font-medium">
                                     📝 Text Content
-                                </span>
-                            )}
-                            {contentSources.includes('video_asset_detected') && (
-                                <span className="text-[10px] bg-yellow-900/50 text-yellow-300 px-2 py-0.5 rounded-full border border-yellow-700/30 font-medium">
-                                    🎥 Video (no transcript)
                                 </span>
                             )}
                         </div>
