@@ -430,7 +430,7 @@ const App: React.FC = () => {
                     </span>
                   ) : state.analysisResult ? (
                     <span className="flex items-center justify-center gap-2">
-                      Engine Ignited! 🚀 (v5.7)
+                      Engine Ignited! 🚀 (v6.0)
                     </span>
                   ) : (
                     <span className="flex items-center justify-center gap-2">
@@ -479,4 +479,3 @@ const App: React.FC = () => {
 };
 
 export default App;
-// Trigger build for v5.7 Restoration

@@ -21,6 +21,7 @@ const LessonsPanel: React.FC<LessonsPanelProps> = ({ courseId, courseName, userN
     const [error, setError] = useState<string | null>(null);
     const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
     const [generatedContent, setGeneratedContent] = useState<string>('');
+    const [contentSources, setContentSources] = useState<string[]>([]);
     const [isGenerating, setIsGenerating] = useState(false);
     const [isBulkGenerating, setIsBulkGenerating] = useState(false);
     const [bulkProgress, setBulkProgress] = useState({ current: 0, total: 0 });
@@ -54,6 +55,7 @@ const LessonsPanel: React.FC<LessonsPanelProps> = ({ courseId, courseName, userN
     const generateForLesson = useCallback(async (lesson: Lesson) => {
         setIsGenerating(true);
         setGeneratedContent('');
+        setContentSources([]);
 
         try {
             const response = await fetch('/api/generate-lesson', {
@@ -71,6 +73,7 @@ const LessonsPanel: React.FC<LessonsPanelProps> = ({ courseId, courseName, userN
 
             const data = await response.json();
             setGeneratedContent(data.description || '');
+            setContentSources(data.sources || []);
             setSelectedLesson(lesson);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Generation failed');
@@ -254,6 +257,33 @@ const LessonsPanel: React.FC<LessonsPanelProps> = ({ courseId, courseName, userN
                             ⚡ Update on Whop
                         </button>
                     </div>
+
+                    {/* v6.0: Content Source Badges */}
+                    {contentSources.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mb-3">
+                            {contentSources.some(s => s.startsWith('pdf:')) && (
+                                <span className="text-[10px] bg-blue-900/50 text-blue-300 px-2 py-0.5 rounded-full border border-blue-700/30 font-medium">
+                                    📄 PDF Read
+                                </span>
+                            )}
+                            {contentSources.includes('youtube_transcript') && (
+                                <span className="text-[10px] bg-red-900/50 text-red-300 px-2 py-0.5 rounded-full border border-red-700/30 font-medium">
+                                    🎬 Transcript
+                                </span>
+                            )}
+                            {contentSources.includes('lesson_text') && (
+                                <span className="text-[10px] bg-green-900/50 text-green-300 px-2 py-0.5 rounded-full border border-green-700/30 font-medium">
+                                    📝 Text Content
+                                </span>
+                            )}
+                            {contentSources.includes('video_asset_detected') && (
+                                <span className="text-[10px] bg-yellow-900/50 text-yellow-300 px-2 py-0.5 rounded-full border border-yellow-700/30 font-medium">
+                                    🎥 Video (no transcript)
+                                </span>
+                            )}
+                        </div>
+                    )}
+
                     <div className="text-gray-300 text-sm whitespace-pre-wrap max-h-40 overflow-y-auto">
                         {generatedContent}
                     </div>

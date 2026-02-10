@@ -1,15 +1,95 @@
 /**
- * CourseRocket - Generate Lesson Description API
+ * CourseRocket v6.0 - Generate Lesson Description API
  * 
- * Uses AI to generate a description for a specific lesson.
+ * WORKFLOW DEPTH: PDF Reading + YouTube Transcript + AI Generation
+ * 
+ * Uses AI to generate a rich description for a specific lesson by:
+ * 1. Fetching lesson data from Whop API (content, attachments, video)
+ * 2. Extracting text from PDF attachments via pdf-parse
+ * 3. Fetching YouTube/Loom transcripts
+ * 4. Feeding all context to AI for high-quality description generation
+ * 
  * Endpoint: POST /api/generate-lesson
- * Body: { lessonTitle, courseName, userNote }
- * 
- * Returns: { description }
+ * Body: { lessonId, lessonTitle, courseName, userNote }
+ * Returns: { description, sources }
  */
 
 const GROQ_API_KEY = (process.env.GROQ_API_KEY || '').trim();
 
+// ─── PDF TEXT EXTRACTION ───────────────────────────────────────────
+async function extractPdfText(url: string, filename: string): Promise<string> {
+    try {
+        console.log(`📄 Downloading PDF: ${filename}`);
+        const response = await fetch(url);
+        if (!response.ok) {
+            console.error(`❌ PDF download failed: ${response.status}`);
+            return '';
+        }
+
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+
+        console.log(`📄 PDF downloaded: ${(buffer.length / 1024).toFixed(1)}KB`);
+
+        // pdf-parse v2 API
+        const { PDFParse } = await import('pdf-parse');
+        const parser = new PDFParse({ data: new Uint8Array(buffer) });
+        const textResult = await parser.getText();
+        await parser.destroy();
+
+        const text = textResult?.text || '';
+        console.log(`📄 PDF extracted: ${text.length} chars from ${filename}`);
+
+        // Limit to 4000 chars to avoid token overflow
+        return text.substring(0, 4000);
+    } catch (err: any) {
+        console.error(`⚠️ PDF extraction failed for ${filename}:`, err.message);
+        return '';
+    }
+}
+
+// ─── YOUTUBE / LOOM TRANSCRIPT ─────────────────────────────────────
+function extractVideoId(url: string): string | null {
+    // YouTube patterns
+    const ytMatch = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i);
+    if (ytMatch) return ytMatch[1];
+    return null;
+}
+
+function findVideoUrls(text: string): string[] {
+    const urlRegex = /https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/|loom\.com\/share\/)[^\s"'<>]+/gi;
+    return text.match(urlRegex) || [];
+}
+
+async function fetchYouTubeTranscript(videoUrl: string): Promise<string> {
+    try {
+        const videoId = extractVideoId(videoUrl);
+        if (!videoId) {
+            console.log(`⚠️ Could not extract video ID from: ${videoUrl}`);
+            return '';
+        }
+
+        console.log(`🎬 Fetching transcript for video: ${videoId}`);
+        const { YoutubeTranscript } = await import('youtube-transcript');
+        const transcript = await YoutubeTranscript.fetchTranscript(videoId);
+
+        if (!transcript || transcript.length === 0) {
+            console.log(`⚠️ No transcript available for: ${videoId}`);
+            return '';
+        }
+
+        const fullText = transcript.map((t: any) => t.text).join(' ');
+        console.log(`🎬 Transcript fetched: ${fullText.length} chars`);
+
+        // Limit to 3000 chars
+        return fullText.substring(0, 3000);
+    } catch (err: any) {
+        console.error(`⚠️ Transcript fetch failed:`, err.message);
+        return '';
+    }
+}
+
+// ─── MAIN HANDLER ──────────────────────────────────────────────────
 export default async function handler(req: any, res: any) {
     // CORS
     res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -29,10 +109,11 @@ export default async function handler(req: any, res: any) {
 
     const apiKey = process.env.WHOP_API_KEY;
     let lessonContext = "";
+    const sources: string[] = []; // Track what content sources were used
 
-    // --- 1. OPTIONAL DEEP ANALYSIS: Fetch lesson details if lessonId is provided ---
+    // ─── 1. DEEP ANALYSIS: Fetch lesson details ────────────────────
     if (lessonId && apiKey) {
-        console.log(`🔍 Deep Analyzing lesson: ${lessonId}`);
+        console.log(`🔍 v6.0 Deep Analyzing lesson: ${lessonId}`);
         try {
             const lessonRes = await fetch(`https://api.whop.com/api/v5/course-lessons/${lessonId}`, {
                 method: 'GET',
@@ -45,33 +126,68 @@ export default async function handler(req: any, res: any) {
             if (lessonRes.ok) {
                 const lessonData = await lessonRes.json();
 
-                // Extract text content
+                // ── A: Extract text content ──
                 if (lessonData.content) {
-                    lessonContext += `\nLESSON CONTENT:\n${lessonData.content.substring(0, 3000)}\n`;
+                    lessonContext += `\nLESSON TEXT CONTENT:\n${lessonData.content.substring(0, 3000)}\n`;
+                    sources.push('lesson_text');
                 }
 
-                // Extract attachment names
+                // ── B: Extract PDF text from attachments ──
                 if (lessonData.attachments && Array.isArray(lessonData.attachments) && lessonData.attachments.length > 0) {
-                    const filenames = lessonData.attachments.map((a: any) => a.filename).join(', ');
-                    lessonContext += `\nATTACHMENTS: ${filenames}\n`;
+                    for (const att of lessonData.attachments) {
+                        const isPdf = att.content_type === 'application/pdf' ||
+                            (att.filename && att.filename.toLowerCase().endsWith('.pdf'));
+
+                        if (isPdf && att.url) {
+                            const pdfText = await extractPdfText(att.url, att.filename || 'unknown.pdf');
+                            if (pdfText) {
+                                lessonContext += `\nPDF CONTENT (${att.filename}):\n${pdfText}\n`;
+                                sources.push(`pdf:${att.filename}`);
+                            }
+                        } else {
+                            // Non-PDF attachment — at least log the filename
+                            lessonContext += `\nATTACHMENT: ${att.filename} (${att.content_type || 'unknown type'})\n`;
+                            sources.push(`file:${att.filename}`);
+                        }
+                    }
                 }
 
-                // Video info
-                if (lessonData.video_asset) {
-                    lessonContext += `\nVIDEO LESSON: This lesson contains a video asset.\n`;
+                // ── C: Extract YouTube/Loom transcript ──
+                // Check for video URL in lesson content or video_url field
+                let videoUrl = '';
+
+                if (lessonData.video_url) {
+                    videoUrl = lessonData.video_url;
+                } else if (lessonData.video?.url) {
+                    videoUrl = lessonData.video.url;
+                } else if (lessonData.content) {
+                    // Look for YouTube/Loom links in the lesson text
+                    const urls = findVideoUrls(lessonData.content);
+                    if (urls.length > 0) videoUrl = urls[0];
                 }
 
-                console.log(`📦 Fetched context size: ${lessonContext.length} chars`);
+                if (videoUrl) {
+                    const transcript = await fetchYouTubeTranscript(videoUrl);
+                    if (transcript) {
+                        lessonContext += `\nVIDEO TRANSCRIPT:\n${transcript}\n`;
+                        sources.push('youtube_transcript');
+                    }
+                } else if (lessonData.video_asset) {
+                    lessonContext += `\nVIDEO LESSON: This lesson contains an uploaded video asset (transcript not available for direct uploads).\n`;
+                    sources.push('video_asset_detected');
+                }
+
+                console.log(`📦 v6.0 Context size: ${lessonContext.length} chars | Sources: ${sources.join(', ')}`);
             }
         } catch (err) {
-            console.error('⚠️ Could not fetch lesson details for deep analysis:', err);
-            // Non-blocking error, we continue with just title
+            console.error('⚠️ Could not fetch lesson details:', err);
         }
     }
 
-    console.log(`🎯 Generating description for lesson: "${lessonTitle}" | Deep Analysis: ${lessonContext ? 'YES' : 'NO'}`);
+    console.log(`🎯 v6.0 Generating for: "${lessonTitle}" | Sources: ${sources.length > 0 ? sources.join(', ') : 'title_only'}`);
 
     try {
+        // ─── 2. BUILD AI PROMPT ────────────────────────────────────
         let systemPrompt = `You are a course content expert. Write a concise, engaging lesson description (2-3 paragraphs max).
 
 FORMAT:
@@ -85,14 +201,28 @@ FORMAT:
             systemPrompt += `\n\nIMPORTANT: Adapt the tone and perspective for: "${userNote}"`;
         }
 
-        const userMessage = `Detailed information about this lesson:
+        // Dynamic prompt based on available sources
+        const hasRichContent = sources.some(s => s.startsWith('pdf:') || s === 'youtube_transcript' || s === 'lesson_text');
+
+        const userMessage = hasRichContent
+            ? `You have DETAILED CONTENT from this lesson. Use it to write a highly specific, accurate description.
 
 Course: ${courseName}
 Lesson Title: ${lessonTitle}
-${lessonContext ? `\nCONTEXT FROM LESSON CONTENT/FILES:\n${lessonContext}\n` : ""}
 
-Based on the title ${lessonContext ? "and the content provided above" : "only"}, create an engaging, high-converting description for this lesson. Tell students exactly what they'll learn and why this specific lesson is valuable for them.`;
+RICH CONTENT FROM LESSON:
+${lessonContext}
 
+CRITICAL: Your description must reference SPECIFIC concepts, terms, and ideas from the content above. Do NOT write generic descriptions. The student should feel that this description was hand-crafted for THIS exact lesson.`
+            : `Based on the lesson title only, create an engaging description.
+
+Course: ${courseName}
+Lesson Title: ${lessonTitle}
+${lessonContext ? `\nAvailable context:\n${lessonContext}` : ''}
+
+Create an engaging, high-converting description for this lesson. Tell students exactly what they'll learn and why this specific lesson is valuable.`;
+
+        // ─── 3. CALL AI ────────────────────────────────────────────
         const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
             method: 'POST',
             headers: {
@@ -117,13 +247,14 @@ Based on the title ${lessonContext ? "and the content provided above" : "only"},
         const data = await response.json();
         const description = data.choices?.[0]?.message?.content?.trim() || '';
 
-        console.log(`✅ Generated ${description.length} chars for: ${lessonTitle}`);
+        console.log(`✅ v6.0 Generated ${description.length} chars for: ${lessonTitle} | Sources used: ${sources.join(', ') || 'title_only'}`);
 
         return res.status(200).json({
             success: true,
             description,
             lessonTitle,
-            courseName
+            courseName,
+            sources // Return sources so frontend can show feedback
         });
 
     } catch (error: any) {
