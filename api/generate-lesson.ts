@@ -70,22 +70,26 @@ async function fetchYouTubeTranscript(videoUrl: string): Promise<string> {
             return '';
         }
 
-        console.log(`🎬 Fetching transcript for video: ${videoId}`);
+        console.log(`🎬 Fetching transcript for video ID: ${videoId}`);
         const { YoutubeTranscript } = await import('youtube-transcript');
         const transcript = await YoutubeTranscript.fetchTranscript(videoId);
 
         if (!transcript || transcript.length === 0) {
-            console.log(`⚠️ No transcript available for: ${videoId}`);
+            console.log(`⚠️ No transcript available for video: ${videoId}`);
             return '';
         }
 
         const fullText = transcript.map((t: any) => t.text).join(' ');
-        console.log(`🎬 Transcript fetched: ${fullText.length} chars`);
+        console.log(`🎬 Transcript fetched successfully: ${fullText.length} chars`);
 
         // Limit to 3000 chars
         return fullText.substring(0, 3000);
     } catch (err: any) {
-        console.error(`⚠️ Transcript fetch failed:`, err.message);
+        console.error(`❌ CRITICAL: YoutubeTranscript fetch failed for ${videoUrl}. Error:`, err.message);
+        // Special log for restricted videos (common cause of failure)
+        if (err.message?.includes('status 403') || err.message?.includes('Transcription is disabled')) {
+            console.error(`🔒 This video might be restricted or has disabled subtitles.`);
+        }
         return '';
     }
 }

@@ -59,13 +59,23 @@ export default async function handler(req: any, res: any) {
             body: JSON.stringify({ description: newDescription })
         });
 
-        const data = await response.json();
+        const text = await response.text();
+        console.log(`📦 Whop Update Response (${response.status}): ${text.substring(0, 200)}`);
+
+        let data: any = {};
+        if (text) {
+            try {
+                data = JSON.parse(text);
+            } catch (e) {
+                console.warn("Could not parse Whop update response as JSON, but status was OK");
+            }
+        }
 
         if (!response.ok) {
             console.error(`❌ Whop API Error (${response.status}):`, data);
             return res.status(response.status).json({
                 success: false,
-                error: data.message || data.error || 'Failed to update course',
+                error: (data && data.message) || (data && data.error) || 'Failed to update course',
                 details: data
             });
         }
