@@ -93,12 +93,25 @@ export default async function handler(req: any, res: any) {
                 if (lessonData.main_pdf && typeof lessonData.main_pdf === 'string') {
                     console.log(`📄 Found Main PDF: ${lessonData.main_pdf}`);
                     allLinks.push(lessonData.main_pdf);
+
+                    // v7.5: Extract filename from main_pdf
+                    const mainPdfName = lessonData.main_pdf.split('/').pop();
+                    if (mainPdfName) {
+                        lessonContext += `\nMAIN FILE NAME: ${mainPdfName}\n`;
+                    }
                 }
 
                 if (lessonData.content) {
                     const cleanText = extractPlainText(lessonData.content);
                     lessonContext += `\nLESSON TEXT CONTENT:\n${cleanText.substring(0, 3000)}\n`;
                     sources.push('lesson_text');
+                }
+
+                // v7.5: Check for Video Files to use their names
+                const videoFiles = allLinks.filter(u => u && (u.match(/\.(mp4|mov|avi|webm)$/i) || u.includes('youtube.com') || u.includes('youtu.be') || u.includes('loom.com')));
+                if (videoFiles.length > 0) {
+                    const videoNames = videoFiles.map(v => v.split('/').pop()).join(', ');
+                    lessonContext += `\nVIDEO FILES DETECTED (Use names as context): ${videoNames}\n`;
                 }
 
                 // Check for PDFs (deduplicated)
@@ -127,7 +140,11 @@ export default async function handler(req: any, res: any) {
  - Clear, direct language
  - Focus on what students will learn
  - Include 2-3 key takeaways as bullet points
- - End with an encouraging note`;
+ - End with an encouraging note
+
+ IF TEXT CONTENT IS MISSING:
+ - Rely on the Lesson Title and any File Names (e.g. 'Intro.mp4', 'Chapter1.pages') to infer the topic.
+ - Do NOT apologize for missing content. Just write the best description possible based on the title and filenames.`;
 
         if (userNote) {
             systemPrompt += `\n\nIMPORTANT: Adapt for: "${userNote}"`;
