@@ -4,6 +4,7 @@
  * Lists all lessons for a given course.
  * Uses Whop v1 API with underscores.
  */
+import { extractPlainText } from './content-utils';
 
 export default async function handler(req: any, res: any) {
     // CORS
@@ -97,7 +98,6 @@ export default async function handler(req: any, res: any) {
         console.log(`✅ Total unique lessons found: ${allLessons.length}`);
 
         // 5. Map to simplified format
-        const { extractPlainText } = require('./content-utils');
 
         const mappedLessons = allLessons
             .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))

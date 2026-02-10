@@ -15,6 +15,7 @@
  */
 
 const GROQ_API_KEY = (process.env.GROQ_API_KEY || '').trim();
+import { extractPlainText, extractLinksFromContent } from './content-utils';
 
 // ─── PDF TEXT EXTRACTION ───────────────────────────────────────────
 async function extractPdfText(url: string, filename: string): Promise<string> {
@@ -125,7 +126,6 @@ export default async function handler(req: any, res: any) {
 
             if (lessonRes.ok) {
                 const lessonData = await lessonRes.json();
-                const { extractPlainText, extractLinksFromContent } = require('./content-utils');
 
                 // v6.0 Metadata: Extract attachment names as hammadde (raw materials)
                 if (lessonData.attachments && Array.isArray(lessonData.attachments)) {
