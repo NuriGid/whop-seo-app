@@ -38,13 +38,13 @@ export function extractPlainText(content: any): string {
 }
 
 /**
- * Scans TipTap JSON for specific URLs (YouTube, Loom, PDFs)
+ * Scans TipTap JSON for PDF URLs
  */
 export function extractLinksFromContent(content: any): string[] {
     const jsonStr = typeof content === 'object' ? JSON.stringify(content) : String(content);
 
-    // v6.4 EXPANDED REGEX: Handles /embed/, /shorts/, /v/, etc.
-    const urlRegex = /https?:\/\/(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/|v\/)|youtu\.be\/|loom\.com\/share\/|[^\s"'<>]+?\.pdf)[^\s"'<>]+/gi;
+    // v7.0 Simplified: Only look for PDFs
+    const urlRegex = /https?:\/\/[^\s"'<>]+?\.pdf/gi;
     const matches = jsonStr.match(urlRegex) || [];
 
     // Also look specifically for TipTap link marks
@@ -55,7 +55,7 @@ export function extractLinksFromContent(content: any): string[] {
 
         if (node.marks && Array.isArray(node.marks)) {
             for (const mark of node.marks) {
-                if (mark.type === 'link' && mark.attrs?.href) {
+                if (mark.type === 'link' && mark.attrs?.href && mark.attrs.href.toLowerCase().endsWith('.pdf')) {
                     specificLinks.push(mark.attrs.href);
                 }
             }
@@ -75,12 +75,11 @@ export function extractLinksFromContent(content: any): string[] {
 }
 
 /**
- * Recursively scans an object for media links (YouTube, Loom, PDF)
+ * Recursively scans an object for PDF links
  */
 export function deepSearchUrls(obj: any): string[] {
     const urls: string[] = [];
-    // v6.4 EXPANDED REGEX: Consistent across all search tools
-    const urlRegex = /https?:\/\/(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/|v\/)|youtu\.be\/|loom\.com\/share\/|[^\s"'<>]+?\.pdf)[^\s"'<>]+/gi;
+    const urlRegex = /https?:\/\/[^\s"'<>]+?\.pdf/gi;
 
     const scan = (item: any) => {
         if (!item) return;
@@ -102,30 +101,4 @@ export function deepSearchUrls(obj: any): string[] {
 
     scan(obj);
     return Array.from(new Set(urls));
-}
-
-/**
- * Searches and returns ANY string value in an object that contains a keyword.
- * Used for investigating where Whop hides data.
- */
-export function forensicSearch(obj: any, keyword: string): string[] {
-    const findings: string[] = [];
-    const lowerKeyword = keyword.toLowerCase();
-
-    const scan = (item: any) => {
-        if (!item) return;
-
-        if (typeof item === 'string') {
-            if (item.toLowerCase().includes(lowerKeyword)) {
-                findings.push(item);
-            }
-        } else if (Array.isArray(item)) {
-            item.forEach(scan);
-        } else if (typeof item === 'object') {
-            Object.values(item).forEach(scan);
-        }
-    };
-
-    scan(obj);
-    return Array.from(new Set(findings));
 }
