@@ -138,11 +138,33 @@ const ResultCard: React.FC<ResultCardProps> = ({ result, courseId, companyId, on
         onWhopAction?.('announce', true, '✅ Announcement published on Whop!');
         setTimeout(() => setSuccessAction(null), 3000);
       } else {
-        const errorMsg = data.details ? `${data.error}: ${JSON.stringify(data.details)}` : data.error;
-        onWhopAction?.('announce', false, `❌ Failed: ${errorMsg}`);
+        // v7.9: Smart Fallback
+        // If API fails (e.g. 401 Unauthorized), we help the user do it manually
+        console.warn("API Failed, triggering fallback:", data);
+
+        const textToCopy = `${result.whopAnnouncement.title}\n\n${result.whopAnnouncement.body}`;
+        await navigator.clipboard.writeText(textToCopy);
+
+        const dashboardUrl = companyId
+          ? `https://whop.com/dashboard/companies/${companyId}/marketing`
+          : 'https://whop.com/dashboard';
+
+        window.open(dashboardUrl, '_blank');
+
+        onWhopAction?.('announce', false, '⚠️ API Restricted. Text Copied! Opening Dashboard...');
       }
     } catch (error: any) {
-      onWhopAction?.('announce', false, `❌ Error: ${error.message}`);
+      // v7.9: Smart Fallback for Network Errors too
+      const textToCopy = `${result.whopAnnouncement.title}\n\n${result.whopAnnouncement.body}`;
+      await navigator.clipboard.writeText(textToCopy);
+
+      const dashboardUrl = companyId
+        ? `https://whop.com/dashboard/companies/${companyId}/marketing`
+        : 'https://whop.com/dashboard';
+
+      window.open(dashboardUrl, '_blank');
+
+      onWhopAction?.('announce', false, '⚠️ Network Error. Text Copied! Opening Dashboard...');
     } finally {
       setLoadingAction(null);
     }
