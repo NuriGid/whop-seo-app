@@ -47,10 +47,11 @@ export default async function handler(req: any, res: any) {
             });
         }
 
-        // POST to Whop API v1 - Announcements
-        console.log(`📢 Creating announcement: "${title}" (v1)...`);
+        // POST to Whop API v2 - Notifications (Broadcast)
+        console.log(`📢 Sending notification: "${title}"...`);
 
-        const response = await fetch('https://api.whop.com/api/v1/company/announcements', {
+        // Note: Notifications API requires 'content' instead of 'body'
+        const response = await fetch('https://api.whop.com/api/v2/notifications', {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${apiKey}`,
@@ -58,8 +59,10 @@ export default async function handler(req: any, res: any) {
             },
             body: JSON.stringify({
                 title,
-                body,
-                ...(companyId && { company_id: companyId })
+                content: body, // Map 'body' to 'content'
+                ...(companyId && { company_id: companyId }),
+                // Optional: Link to open when clicked
+                rest_path: '/home'
             })
         });
 
