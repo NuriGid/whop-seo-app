@@ -331,8 +331,8 @@ const App: React.FC = () => {
         {/* Header */}
         <div className="text-center mb-8">
           <div className="inline-block mb-2">
-            <span className="text-xs font-semibold bg-gradient-to-r from-green-500 to-emerald-500 text-white px-3 py-1 rounded-full">
-              Topic Lock v5.5
+            <span className="bg-emerald-500/20 text-emerald-300 text-xs px-2 py-0.5 rounded-full font-medium border border-emerald-500/30">
+              Topic Lock v7.9.1
             </span>
           </div>
           <h1 className="text-4xl font-bold bg-gradient-to-r from-indigo-400 via-purple-500 to-pink-500 bg-clip-text text-transparent mb-3">
@@ -430,7 +430,7 @@ const App: React.FC = () => {
                     </span>
                   ) : state.analysisResult ? (
                     <span className="flex items-center justify-center gap-2">
-                      Engine Ignited! 🚀 (v6.0)
+                      Engine Ignited! 🚀 (v7.9.1)
                     </span>
                   ) : (
                     <span className="flex items-center justify-center gap-2">
