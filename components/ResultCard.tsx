@@ -240,19 +240,29 @@ const ResultCard: React.FC<ResultCardProps> = ({ result, courseId, companyId, on
                 {copiedSection === 'whop-announce' ? <CheckIcon className="w-4 h-4" /> : <CopyIcon className="w-4 h-4" />}
               </button>
               <button
-                onClick={handlePublishAnnouncement}
-                disabled={loadingAction === 'announce' || successAction === 'announce'}
+                onClick={async () => {
+                  const textToCopy = `${result.whopAnnouncement.title}\n\n${result.whopAnnouncement.body}`;
+                  await navigator.clipboard.writeText(textToCopy);
+
+                  const dashboardUrl = companyId
+                    ? `https://whop.com/dashboard/companies/${companyId}/marketing`
+                    : 'https://whop.com/dashboard';
+
+                  window.open(dashboardUrl, '_blank');
+
+                  setSuccessAction('announce');
+                  onWhopAction?.('announce', true, '📋 Copied! Opening Dashboard...');
+                  setTimeout(() => setSuccessAction(null), 3000);
+                }}
                 className={`flex items-center gap-2 font-semibold px-4 py-2 rounded-lg transition-all shadow-lg ${successAction === 'announce'
                   ? 'bg-green-600 text-white cursor-default'
-                  : 'bg-orange-600 hover:bg-orange-500 disabled:opacity-50 disabled:cursor-not-allowed text-white'
+                  : 'bg-orange-600 hover:bg-orange-500 text-white'
                   }`}
               >
-                {loadingAction === 'announce' ? (
-                  <><LoadingSpinner className="w-4 h-4" /> Publishing...</>
-                ) : successAction === 'announce' ? (
-                  <><CheckIcon className="w-4 h-4" /> Published! ✅</>
+                {successAction === 'announce' ? (
+                  <><CheckIcon className="w-4 h-4" /> Opening Dashboard...</>
                 ) : (
-                  <>📢 PUBLISH ON WHOP</>
+                  <>📋 COPY & GO TO DASHBOARD</>
                 )}
               </button>
             </div>
