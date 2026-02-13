@@ -1,47 +1,37 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+This is a template for a whop app built in NextJS. Fork it and keep the parts you need for your app.
 
-# Whop Course Analyzer
+# Whop NextJS App Template
 
-## 🔒 Authentication Checklist (IMPORTANT!)
+To run this project:
 
-**Production (Whop App Store):**
-- ☑️ Token required via Whop SDK (`window.Whop.getAccessToken()`)
-- ☑️ No token = App locked (shows "open inside Whop" banner)
-- ☑️ All UI disabled without authentication
-- ☑️ Backend rejects requests without `Authorization` header
-- ☑️ NO fallback to URL params or manual test mode
+1. Install dependencies with: `pnpm i`
 
-**Development (Local Testing):**
-- ☑️ Whop SDK token (if available)
-- ☑️ Fallback to URL param `?token=xxx` allowed
-- ☑️ Set `NODE_ENV=development` for testing
+2. Create a Whop App on your [whop developer dashboard](https://whop.com/dashboard/developer/), then go to the "Hosting" section and:
+	- Ensure the "Base URL" is set to the domain you intend to deploy the site on.
+	- Ensure the "App path" is set to `/experiences/[experienceId]`
+	- Ensure the "Dashboard path" is set to `/dashboard/[companyId]`
+	- Ensure the "Discover path" is set to `/discover`
 
----
+3. Copy the environment variables from the `.env.development` into a `.env.local`. Ensure to use real values from the whop dashboard.
 
-This tool analyzes Whop course content and extracts key information like course structure, lessons, and metadata.
+4. Go to a whop created in the same org as the app you created. Navigate to the tools section and add your app.
 
-## Features
-- Extract course structure
-- Analyze lesson content
-- Generate course summaries
-- Export data in various formats
+5. Run `pnpm dev` to start the dev server. Then in the top right of the window find a translucent settings icon. Select "localhost". The default port 3000 should work.
 
-## Usage
-1. Install dependencies: `npm install`
-2. Run the analyzer: `node index.js`
-3. View results in the output directory
+## Deploying
 
-## Configuration
-The `.openspec/config.json` file contains the project configuration.
+1. Upload your fork / copy of this template to github.
 
-## Run Locally
+2. Go to [Vercel](https://vercel.com/new) and link the repository. Deploy your application with the environment variables from your `.env.local`
 
-**Prerequisites:**  Node.js
+3. If necessary update you "Base Domain" and webhook callback urls on the app settings page on the whop dashboard.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## Troubleshooting
+
+**App not loading properly?** Make sure to set the "App path" in your Whop developer dashboard. The placeholder text in the UI does not mean it's set - you must explicitly enter `/experiences/[experienceId]` (or your chosen path name)
+a
+
+**Make sure to add env.local** Make sure to get the real app environment vairables from your whop dashboard and set them in .env.local
+
+
+For more info, see our docs at https://dev.whop.com/introduction
