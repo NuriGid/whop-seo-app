@@ -20,13 +20,48 @@ export default async function DashboardPage({
 	const { userId } = await whopsdk.verifyUserToken(await headers());
 
 	// 1. Fetch Core Data
-	const [company, user, experiences, payments, studentPulse] = await Promise.all([
-		whopsdk.companies.retrieve(companyId),
-		whopsdk.users.retrieve(userId),
-		getCompanyExperiences(companyId),
-		getPaymentsReport(companyId),
-		getStudentPulse(companyId),
-	]);
+	// 1. Fetch Core Data with Error Handling - SAFETY FIRST 🛡️
+	let company, user, experiences, payments, studentPulse;
+	try {
+		[company, user, experiences, payments, studentPulse] = await Promise.all([
+			whopsdk.companies.retrieve(companyId).catch(e => { console.error("Company fetch error:", e); return null; }),
+			whopsdk.users.retrieve(userId).catch(e => { console.error("User fetch error:", e); return { name: "User", username: "unknown" }; }),
+			getCompanyExperiences(companyId).catch(e => { console.error("Experiences fetch error:", e); return []; }),
+			getPaymentsReport(companyId).catch(e => { console.error("Payments fetch error:", e); return { count: 0, potentialRevenue: 0 }; }),
+			getStudentPulse(companyId).catch(e => { console.error("Student pulse fetch error:", e); return { total: 0, inactiveCount: 0, avgProgress: 0 }; }),
+		]);
+	} catch (error) {
+		console.error("Critical Dashboard Load Error:", error);
+		// Return a friendly error UI instead of a white screen
+		return (
+			<div className="flex flex-col items-center justify-center p-12 text-center h-screen bg-gray-50">
+				<div className="bg-white p-8 rounded-2xl shadow-xl border border-red-100 max-w-lg">
+					<div className="text-4xl mb-4">🌪️</div>
+					<h1 className="text-xl font-bold text-red-600 mb-2">Veri Bağlantısında Sorun Var</h1>
+					<p className="text-gray-600 mb-6">
+						Hocam, dükkan verilerini çekerken bir engelle karşılaştım. 
+						Bu genellikle <strong>Eksik API Anahtarı</strong> veya <strong>Yetkisiz Erişim</strong> kaynaklıdır.
+					</p>
+					<div className="bg-gray-100 p-4 rounded-lg text-left text-xs font-mono text-gray-700 overflow-auto max-h-40">
+						{error instanceof Error ? error.message : JSON.stringify(error)}
+					</div>
+					<div className="mt-6 text-2 text-gray-400">
+						Lütfen Vercel Environment Variables ayarlarını kontrol et.
+					</div>
+				</div>
+			</div>
+		);
+	}
+
+	if (!company) {
+		return (
+			<div className="flex flex-col items-center justify-center p-12 h-screen">
+				<h1 className="text-2xl font-bold text-gray-800">Şirket Bulunamadı 🤷‍♂️</h1>
+				<p className="text-gray-500 mt-2">ID: {companyId}</p>
+				<p className="text-sm text-gray-400 mt-4">API Key'in bu şirket için yetkisi olduğundan emin misin?</p>
+			</div>
+		);
+	}
 
 	// 2. Fetch Engagement Signals (from the first experience for now)
 	const firstExperience = experiences[0];
