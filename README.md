@@ -1,6 +1,17 @@
 This is a template for a whop app built in NextJS. Fork it and keep the parts you need for your app.
 
-# Whop NextJS App Template
+# Whop Pilot: Handover & Deployment Guide 🛫 (UPDATED)
+
+The Whop Pilot assistant is now live at the **ROOT** of the repository. Legacy CourseRocket has been removed.
+
+# Whop Pilot 🚀
+
+Whop Pilot is now the primary application located at the root directory. It has completely replaced the legacy CourseRocket system.
+
+## Setup
+1. Framework: Next.js (Ensure Vercel Framework Preset is set to Next.js)
+2. Build Command: `npm run build`
+3. Output Directory: `.next`
 
 To run this project:
 
