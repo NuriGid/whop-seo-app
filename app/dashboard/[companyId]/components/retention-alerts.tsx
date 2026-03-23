@@ -1,5 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@whop/react/components";
-import { AlertTriangle, Users, TrendingDown, Clock } from "lucide-react";
+// Simplified Retention Alerts component using standard HTML elements
 
 interface RetentionAlertsProps {
   studentPulse: {
@@ -24,7 +23,7 @@ export function RetentionAlerts({ studentPulse, payments }: RetentionAlertsProps
       title: 'Sessizleşen Öğrenciler',
       description: `${studentPulse.inactiveCount} öğrenci henüz hiç ders izlemedi`,
       severity: inactiveRate > 30 ? 'high' : inactiveRate > 15 ? 'medium' : 'low',
-      icon: Users,
+      icon: '👥',
       value: `${inactiveRate}%`,
       color: inactiveRate > 30 ? 'text-red-600' : inactiveRate > 15 ? 'text-orange-500' : 'text-green-600'
     },
@@ -33,7 +32,7 @@ export function RetentionAlerts({ studentPulse, payments }: RetentionAlertsProps
       title: 'Terk Edilmiş Sepetler',
       description: `${payments.count} açık ödeme bekliyor`,
       severity: payments.count > 5 ? 'high' : payments.count > 2 ? 'medium' : 'low',
-      icon: Clock,
+      icon: '⏱️',
       value: `$${payments.potentialRevenue}`,
       color: payments.count > 5 ? 'text-red-600' : payments.count > 2 ? 'text-orange-500' : 'text-green-600'
     },
@@ -42,7 +41,7 @@ export function RetentionAlerts({ studentPulse, payments }: RetentionAlertsProps
       title: 'Düşük Katılım Oranı',
       description: `Ortalama ilerleme %${studentPulse.avgProgress}`,
       severity: studentPulse.avgProgress < 30 ? 'high' : studentPulse.avgProgress < 50 ? 'medium' : 'low',
-      icon: TrendingDown,
+      icon: '📉',
       value: `${studentPulse.avgProgress}%`,
       color: studentPulse.avgProgress < 30 ? 'text-red-600' : studentPulse.avgProgress < 50 ? 'text-orange-500' : 'text-green-600'
     }
@@ -58,17 +57,16 @@ export function RetentionAlerts({ studentPulse, payments }: RetentionAlertsProps
   };
 
   return (
-    <Card className="bg-white dark:bg-gray-950 border border-gray-a4">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-gray-12">
-          <AlertTriangle className="w-5 h-5 text-orange-500" />
+    <div className="bg-white dark:bg-gray-950 border border-gray-a4 rounded-[2rem]">
+      <div className="p-8 pb-4">
+        <h2 className="flex items-center gap-2 text-7 font-bold text-gray-12">
+          <span>⚠️</span>
           Retention Uyarıları
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
+        </h2>
+      </div>
+      <div className="p-8 pt-0">
         <div className="space-y-4">
           {alerts.map((alert) => {
-            const Icon = alert.icon;
             return (
               <div 
                 key={alert.id} 
@@ -76,8 +74,8 @@ export function RetentionAlerts({ studentPulse, payments }: RetentionAlertsProps
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-start gap-3">
-                    <div className={`p-2 rounded-xl ${getSeverityColor(alert.severity)} bg-opacity-10`}>
-                      <Icon className={`w-5 h-5 ${alert.color}`} />
+                    <div className={`p-2 rounded-xl ${getSeverityColor(alert.severity)} bg-opacity-10 text-xl`}>
+                      {alert.icon}
                     </div>
                     <div>
                       <h3 className="font-bold text-gray-12">{alert.title}</h3>
@@ -108,7 +106,7 @@ export function RetentionAlerts({ studentPulse, payments }: RetentionAlertsProps
             </p>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
