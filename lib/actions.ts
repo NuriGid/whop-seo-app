@@ -18,6 +18,12 @@ export async function getExperienceForumPosts(experienceId: string) {
 
 export async function getCourseStudents(companyId: string) {
     try {
+        // Validate companyId
+        if (!companyId) {
+            console.error("Invalid companyId provided");
+            return [];
+        }
+        
         const students = [];
         // @ts-ignore - The SDK might have slightly different names for courses/students
         for await (const student of whopsdk.courses.students.list({ company_id: companyId })) {
@@ -66,10 +72,38 @@ export async function generateDailyInsights(posts: any[], students: any, payment
     const GROQ_API_KEY = process.env.GROQ_API_KEY;
     if (!GROQ_API_KEY) return "Hocam, AI anahtarı eksik olduğu için rapor hazırlayamıyorum.";
 
+    const inactiveRate = students.total > 0 
+        ? Math.round((students.inactiveCount / students.total) * 100) 
+        : 0;
+    
+    const churnRisk = inactiveRate > 40 || students.avgProgress < 20 
+        ? 'yüksek' 
+        : inactiveRate > 20 || students.avgProgress < 40 
+        ? 'orta' 
+        : 'düşük';
+
     const context = `
-  - Topluluk: ${posts.length} yeni post/yorum var. Öne çıkanlar: ${posts.slice(0, 2).map(p => p.title).join(", ")}
-  - Öğrenciler: Toplam ${students.total} öğrenci. ${students.inactiveCount} tanesi henüz hiç ders izlemedi.
-  - Satış: Sepette kalan/açıkta bekleyen ${payments.count} ödeme var. Bunları kazanırsak ~$${payments.potentialRevenue} ciro artabilir.
+  DÜKKAN DURUM RAPORU (CEO Dashboard Analizi)
+  
+  📊 TOPLULUK ANALİZİ:
+  - ${posts.length} yeni forum aktivitesi
+  - Öne çıkan tartışmalar: ${posts.slice(0, 2).map(p => p.title || "İsimsiz").join(", ")}
+  
+  👥 ÖĞRENCİ PERFORMANSI:
+  - Toplam öğrenci: ${students.total}
+  - Sessizleşen öğrenciler: ${students.inactiveCount} (%${inactiveRate})
+  - Ortalama ilerleme: %${students.avgProgress}
+  - Churn riski: ${churnRisk} seviye
+  
+  💰 SATIŞ & GELİR:
+  - Bekleyen ödemeler: ${payments.count} adet
+  - Potansiyel kurtarılacak gelir: $${payments.potentialRevenue}
+  - Tahmini gerçek kurtarım: $${Math.round(payments.rawPotential * 0.25)}
+  
+  ⚠️ KRİTİK UYARILAR:
+  ${inactiveRate > 30 ? '- Yüksek öğrenci kaybı riski tespit edildi' : ''}
+  ${payments.count > 3 ? '- Ciddi gelir kaçırma riski var' : ''}
+  ${students.avgProgress < 30 ? '- Düşük katılım oranları dikkat çekiyor' : ''}
   `;
 
     try {
@@ -84,11 +118,16 @@ export async function generateDailyInsights(posts: any[], students: any, payment
                 messages: [
                     {
                         role: "system",
-                        content: "Sen 'Whop Pilot' isimli bir asistansın. Whop dükkan sahiplerine (Hocam diye hitap ederek) günlük rapor veriyorsun. Samimi, proaktif ve aksiyon odaklı olmalısın. Gelen verilere bakarak 'Hocam durum şu...' diyerek 3 maddelik bir aksiyon planı sun. Çok teknik terim kullanma, dükkanı nasıl büyütebileceğine odaklan."
+                        content: "Sen profesyonel bir dükkan yöneticisisin. Whop dükkan sahiplerine (Hocam diye hitap ederek) günlük işletme raporu veriyorsun. Samimi, proaktif ve aksiyon odaklı olmalısın. Gelen verilere bakarak sadece 3 maddelik net, uygulanabilir aksiyon planı sun. Çok teknik terim kullanma, dükkanı nasıl büyütebileceğine odaklan. Her maddeyi emoji ile başlat ve net aksiyon çağrısı yap."
                     },
-                    { role: "user", content: `Hocam dükkanın son verileri geldi, analiz eder misin?\n${context}` }
+                    { 
+                        role: "user", 
+                        content: `Hocam, dükkanın son 24 saatlik performans raporu geldi. Lütfen sadece 3 maddelik acil aksiyon planı ver:
+${context}` 
+                    }
                 ],
                 temperature: 0.8,
+                max_tokens: 500
             })
         });
 
@@ -96,6 +135,6 @@ export async function generateDailyInsights(posts: any[], students: any, payment
         return data.choices?.[0]?.message?.content || "Hocam bugünlük bir rapor çıkaramadım, verileri kontrol edelim.";
     } catch (error) {
         console.error("AI Generation Error:", error);
-        return "AI Raporu hazırlanırken bir hata oluştu Hocam.";
+        return "AI Raporu hazırlanırken bir hata oluştu Hocam. Manuel analiz: \n\n📊 Hemen şu adımları uygulayın:\n1️⃣ Sessizleşen öğrencilere kişisel mesaj atın\n2️⃣ Bekleyen ödemeler için otomatik hatırlatma başlatın\n3️⃣ Forumdaki yeni aktivitelere cevap verin";
     }
 }

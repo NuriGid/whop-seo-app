@@ -6,7 +6,7 @@
 
 ## Summary
 
-We are the developers of **"Content Marketing Assistant"** (App ID: `app_womUHsVbtRHsMx`), an app designed to generate AI-powered marketing content for Whop course creators.
+We are the developers of **"Content Marketing Assistant"** (App ID: `[YOUR_WHOP_APP_ID]`), an app designed to generate AI-powered marketing content for Whop course creators.
 
 Our app was previously rejected from the Whop App Store due to **Data Isolation / Data Leakage concerns** related to using a Company API Key. We have since refactored our entire backend to comply with your security requirements, but we are now stuck with authentication errors that we cannot resolve without your guidance.
 
@@ -45,7 +45,7 @@ import WhopSDK from '@whop/sdk';
 
 const whop = new WhopSDK({
   apiKey: process.env.WHOP_API_KEY,  // App API Key
-  appID: process.env.WHOP_APP_ID     // app_womUHsVbtRHsMx
+  appID: process.env.WHOP_APP_ID     // [YOUR_WHOP_APP_ID]
 });
 
 // Validate incoming user token
@@ -78,8 +78,8 @@ const token = await WhopAPI.getAccessToken();
 
 | Item | Value |
 |------|-------|
-| App ID | `app_womUHsVbtRHsMx` |
-| App API Key | `apik_lZmSAUFo...` (set in Vercel env) |
+| App ID | `[YOUR_WHOP_APP_ID]` |
+| App API Key | `[YOUR_WHOP_API_KEY]` |
 | Hosting | Vercel (Serverless Functions) |
 | SDK Package | `@whop/sdk` (latest) |
 | Permissions Enabled | `courses:read`, `access_pass:basic:read`, `plan:basic:read`, `member:basic:read`, `payment:basic:read` |
@@ -116,4 +116,4 @@ Thank you for your time and assistance.
 
 **Developer:** Nuri Yildirim  
 **App Name:** Content Marketing Assistant  
-**App ID:** app_womUHsVbtRHsMx
+**App ID:** [YOUR_WHOP_APP_ID]

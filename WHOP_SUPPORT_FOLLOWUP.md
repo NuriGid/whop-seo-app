@@ -1,6 +1,6 @@
 # Follow-Up: Still Getting 500 Error After Implementing Your Suggestion
 
-**App ID:** `app_womUHsVbtRHsMx`
+**App ID:** `[YOUR_WHOP_APP_ID]`
 
 ---
 
@@ -65,8 +65,8 @@ We are still getting a **500 Internal Server Error**. The app is:
 
 | Item | Value |
 |------|-------|
-| App ID | `app_womUHsVbtRHsMx` |
-| API Key | `apik_lZmSAUFo...` (set in Vercel env) |
+| App ID | `[YOUR_WHOP_APP_ID]` |
+| API Key | `[YOUR_WHOP_API_KEY]` (set in Vercel env) |
 | Hosting | Vercel Serverless Functions |
 | SDK | `@whop/sdk` (npm latest) |
 | Framework | Vercel API Routes (not Next.js App Router) |

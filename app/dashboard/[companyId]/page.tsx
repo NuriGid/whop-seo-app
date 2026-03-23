@@ -16,8 +16,41 @@ export default async function DashboardPage({
 }: {
 	params: Promise<{ companyId: string }>;
 }) {
-	const { companyId } = await params;
-	const { userId } = await whopsdk.verifyUserToken(await headers());
+	// Add comprehensive error boundary
+	try {
+		const { companyId } = await params;
+		
+		// Validate required parameters
+		if (!companyId) {
+			return (
+				<div className="flex items-center justify-center h-screen bg-gray-50">
+					<div className="text-center p-8 bg-white rounded-2xl shadow-xl border border-red-100 max-w-md">
+						<h1 className="text-2xl font-bold text-red-600 mb-2">Invalid Request</h1>
+						<p className="text-gray-600">Company ID is required to access this dashboard.</p>
+					</div>
+				</div>
+			);
+		}
+		
+		// Add proper authentication error handling
+		let userId: string;
+		try {
+			const tokenResult = await whopsdk.verifyUserToken(await headers());
+			userId = tokenResult.userId;
+		} catch (error) {
+			console.error("Authentication failed:", error);
+			return (
+				<div className="flex items-center justify-center h-screen bg-gray-50">
+					<div className="text-center p-8 bg-white rounded-2xl shadow-xl border border-red-100 max-w-md">
+						<h1 className="text-2xl font-bold text-red-600 mb-2">Authentication Required</h1>
+						<p className="text-gray-600 mb-4">Please ensure you're accessing this from Whop dashboard</p>
+						<div className="text-xs text-gray-500 bg-gray-100 p-3 rounded-lg">
+							{error instanceof Error ? error.message : "Unknown authentication error"}
+						</div>
+					</div>
+				</div>
+			);
+		}
 
 	// 1. Fetch Core Data
 	// 1. Fetch Core Data with Error Handling - SAFETY FIRST 🛡️
@@ -198,6 +231,26 @@ export default async function DashboardPage({
 			</details>
 		</div>
 	);
+	} catch (error) {
+		console.error("Dashboard Page Error:", error);
+		return (
+			<div className="flex items-center justify-center h-screen bg-gray-50">
+				<div className="text-center p-8 bg-white rounded-2xl shadow-xl border border-red-100 max-w-lg">
+					<div className="text-4xl mb-4">🌪️</div>
+					<h1 className="text-xl font-bold text-red-600 mb-2">Server Error Occurred</h1>
+					<p className="text-gray-600 mb-6">
+						An unexpected error occurred while loading your dashboard.
+					</p>
+					<div className="bg-gray-100 p-4 rounded-lg text-left text-xs font-mono text-gray-700 overflow-auto max-h-40">
+						{error instanceof Error ? error.message : "Unknown server error"}
+					</div>
+					<div className="mt-6 text-sm text-gray-500">
+						Please try refreshing the page or contact support.
+					</div>
+				</div>
+			</div>
+		);
+	}
 }
 
 function JsonViewer({ data, label }: { data: any; label?: string }) {

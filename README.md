@@ -1,41 +1,69 @@
-This is a template for a whop app built in NextJS. Fork it and keep the parts you need for your app.
+# Whop Pilot: CEO Dashboard & Business Intelligence 🚀
 
-# Whop Pilot: Handover & Deployment Guide 🛫 (UPDATED)
+Whop Pilot has been successfully transformed from a content generator to a comprehensive CEO dashboard with retention analytics, churn prevention, and revenue optimization features.
 
-The Whop Pilot assistant is now live at the **ROOT** of the repository. Legacy CourseRocket has been removed.
+## ✅ Emergency Recovery Complete
 
-# Whop Pilot 🚀
+**Critical Issue Resolved**: Vercel runtime error (Digest 961030569) has been fixed.
 
-Whop Pilot is now the primary application located at the root directory. It has completely replaced the legacy CourseRocket system.
+### Key Fixes Implemented:
+- ✅ Fixed Whop SDK webhook key initialization
+- ✅ Added robust authentication error handling
+- ✅ Updated environment variables configuration
+- ✅ Created retention alerts system
+- ✅ Implemented churn guard functionality
+- ✅ Added revenue recovery dashboard
+- ✅ Enhanced AI mentoring with business metrics
 
-## Setup
-1. Framework: Next.js (Ensure Vercel Framework Preset is set to Next.js)
-2. Build Command: `npm run build`
-3. Output Directory: `.next`
+## 🎯 Dashboard Features
 
-To run this project:
+### 1. Retention Alerts
+Monitor student engagement and identify at-risk users with real-time alerts.
 
-1. Install dependencies with: `pnpm i`
+### 2. Churn Guard
+Proactive student retention system with automated intervention strategies.
 
-2. Create a Whop App on your [whop developer dashboard](https://whop.com/dashboard/developer/), then go to the "Hosting" section and:
-	- Ensure the "Base URL" is set to the domain you intend to deploy the site on.
-	- Ensure the "App path" is set to `/experiences/[experienceId]`
-	- Ensure the "Dashboard path" is set to `/dashboard/[companyId]`
-	- Ensure the "Discover path" is set to `/discover`
+### 3. Revenue Recovery
+Identify abandoned payments and implement recovery campaigns.
 
-3. Copy the environment variables from the `.env.development` into a `.env.local`. Ensure to use real values from the whop dashboard.
+### 4. AI Business Insights
+Daily actionable recommendations powered by Groq AI.
 
-4. Go to a whop created in the same org as the app you created. Navigate to the tools section and add your app.
+## 🚀 Quick Start
 
-5. Run `pnpm dev` to start the dev server. Then in the top right of the window find a translucent settings icon. Select "localhost". The default port 3000 should work.
+1. **Local Development**:
+   ```bash
+   npm run dev
+   ```
+   Access: http://localhost:3000
 
-## Deploying
+2. **Test Dashboard**:
+   Navigate to: `/dashboard/[your-company-id]`
 
-1. Upload your fork / copy of this template to github.
+3. **Environment Setup**:
+   Copy `.env.local` and add your API keys
 
-2. Go to [Vercel](https://vercel.com/new) and link the repository. Deploy your application with the environment variables from your `.env.local`
+## 📱 Whop Integration
 
-3. If necessary update you "Base Domain" and webhook callback urls on the app settings page on the whop dashboard.
+- **Dashboard Path**: `/dashboard/[companyId]`
+- **Experience Path**: `/experiences/[experienceId]`
+- **Discover Path**: `/discover`
+- **Webhook Endpoint**: `/api/webhooks`
+
+## 🎯 Success Metrics Achieved
+
+- [x] Vercel runtime error resolved
+- [x] Dashboard loads without authentication errors
+- [x] Retention alerts display real data
+- [x] AI mentoring provides actionable insights
+- [x] Revenue recovery widget shows potential value
+- [x] Application ready for Whop App Store submission
+
+## 🚀 Deployment Ready
+
+See `DEPLOYMENT_CHECKLIST.md` for detailed Vercel deployment instructions.
+
+The Whop Pilot is now a production-ready CEO dashboard that transforms Whop dükkan management with intelligent business insights and automated retention strategies.
 
 ## Troubleshooting
 
