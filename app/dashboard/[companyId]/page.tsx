@@ -18,6 +18,7 @@ export default async function DashboardPage({
 }) {
 	// Add comprehensive error boundary
 	try {
+        console.log("Dashboard Page rendering started for companyId:", (await params).companyId);
 		const { companyId } = await params;
 		
 		// Validate required parameters
