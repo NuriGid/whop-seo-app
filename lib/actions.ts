@@ -107,14 +107,14 @@ export async function generateDailyInsights(posts: any[], students: any, payment
   `;
 
     try {
-        const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        const response = await fetch("https://api.x.ai/v1/chat/completions", {
             method: "POST",
             headers: {
                 "Authorization": `Bearer ${GROQ_API_KEY}`,
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({
-                model: "llama-3.1-8b-instant",
+                model: "grok-beta",
                 messages: [
                     {
                         role: "system",
