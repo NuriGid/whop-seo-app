@@ -35,6 +35,9 @@ export default async function DashboardPage({
 		// Add proper authentication error handling
 		let userId: string;
 		try {
+			if (!whopsdk) {
+				throw new Error("Whop SDK config is missing (Check Vercel env vars)");
+			}
 			const tokenResult = await whopsdk.verifyUserToken(await headers());
 			userId = tokenResult.userId;
 		} catch (error) {
