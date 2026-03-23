@@ -1,8 +1,8 @@
-import { whopsdk } from "./whop-sdk";
+import { getWhopClient } from "./whop-sdk";
 
 export async function getCompanyExperiences(companyId: string) {
     const experiences = [];
-    for await (const experience of whopsdk.experiences.list({ company_id: companyId })) {
+    for await (const experience of getWhopClient()!.experiences.list({ company_id: companyId })) {
         experiences.push(experience);
     }
     return experiences;
@@ -10,7 +10,7 @@ export async function getCompanyExperiences(companyId: string) {
 
 export async function getExperienceForumPosts(experienceId: string) {
     const posts = [];
-    for await (const post of whopsdk.forumPosts.list({ experience_id: experienceId })) {
+    for await (const post of getWhopClient()!.forumPosts.list({ experience_id: experienceId })) {
         posts.push(post);
     }
     return posts;
@@ -26,7 +26,7 @@ export async function getCourseStudents(companyId: string) {
         
         const students = [];
         // @ts-ignore - The SDK might have slightly different names for courses/students
-        for await (const student of whopsdk.courses.students.list({ company_id: companyId })) {
+        for await (const student of getWhopClient()!.courses.students.list({ company_id: companyId })) {
             students.push(student);
         }
         return students;
@@ -40,7 +40,7 @@ export async function getPaymentsReport(companyId: string) {
     const openPayments = [];
     let potentialRevenue = 0;
 
-    for await (const payment of whopsdk.payments.list({
+    for await (const payment of getWhopClient()!.payments.list({
         company_id: companyId,
         statuses: ["open"] // Focus on open payments (potentially abandoned or awaiting action)
     })) {

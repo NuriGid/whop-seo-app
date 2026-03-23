@@ -1,7 +1,7 @@
 import { Button } from "@whop/react/components";
 import { headers } from "next/headers";
 import Link from "next/link";
-import { whopsdk } from "@/lib/whop-sdk";
+import { getWhopClient } from "@/lib/whop-sdk";
 import {
 	getCompanyExperiences,
 	getExperienceForumPosts,
@@ -36,8 +36,9 @@ export default async function DashboardPage({
 		// Add proper authentication error handling
 		let userId: string;
 		try {
+            const whopsdk = getWhopClient();
 			if (!whopsdk) {
-				throw new Error("Whop SDK config is missing (Check Vercel env vars)");
+				throw new Error("Whop SDK is not properly configured. Check WHOP_API_KEY and NEXT_PUBLIC_WHOP_APP_ID on Vercel.");
 			}
 			const tokenResult = await whopsdk.verifyUserToken(await headers());
 			userId = tokenResult.userId;
@@ -60,12 +61,13 @@ export default async function DashboardPage({
 	// 1. Fetch Core Data with Error Handling - SAFETY FIRST 🛡️
 	let company, user, experiences, payments, studentPulse;
 	try {
+        const whopsdk = getWhopClient()!;
 		[company, user, experiences, payments, studentPulse] = await Promise.all([
-			whopsdk.companies.retrieve(companyId).catch(e => { console.error("Company fetch error:", e); return null; }),
-			whopsdk.users.retrieve(userId).catch(e => { console.error("User fetch error:", e); return { name: "User", username: "unknown" }; }),
-			getCompanyExperiences(companyId).catch(e => { console.error("Experiences fetch error:", e); return []; }),
-			getPaymentsReport(companyId).catch(e => { console.error("Payments fetch error:", e); return { count: 0, potentialRevenue: 0 }; }),
-			getStudentPulse(companyId).catch(e => { console.error("Student pulse fetch error:", e); return { total: 0, inactiveCount: 0, avgProgress: 0 }; }),
+			whopsdk.companies.retrieve(companyId).catch((e: Error) => { console.error("Company fetch error:", e); return null; }),
+			whopsdk.users.retrieve(userId).catch((e: Error) => { console.error("User fetch error:", e); return { name: "User", username: "unknown" }; }),
+			getCompanyExperiences(companyId).catch((e: Error) => { console.error("Experiences fetch error:", e); return []; }),
+			getPaymentsReport(companyId).catch((e: Error) => { console.error("Payments fetch error:", e); return { count: 0, potentialRevenue: 0 }; }),
+			getStudentPulse(companyId).catch((e: Error) => { console.error("Student pulse fetch error:", e); return { total: 0, inactiveCount: 0, avgProgress: 0 }; }),
 		]);
 	} catch (error) {
 		console.error("Critical Dashboard Load Error:", error);

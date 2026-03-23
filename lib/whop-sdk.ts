@@ -1,21 +1,23 @@
 import { Whop } from "@whop/sdk";
 
-// Safe initialization with logging for Vercel debugging
-const getWhopsdk = () => {
-    console.log("Check: NEXT_PUBLIC_WHOP_APP_ID =", !!process.env.NEXT_PUBLIC_WHOP_APP_ID);
-    console.log("Check: WHOP_API_KEY =", !!process.env.WHOP_API_KEY);
-    console.log("Check: WHOP_WEBHOOK_SECRET =", !!process.env.WHOP_WEBHOOK_SECRET);
+let whopInstance: Whop | null = null;
 
+export const getWhopClient = () => {
+    if (whopInstance) return whopInstance;
+    
     try {
-        return new Whop({
+        if (!process.env.WHOP_API_KEY) {
+            console.error("WHOP_API_KEY is not defined in environment variables.");
+        }
+        
+        whopInstance = new Whop({
             appID: process.env.NEXT_PUBLIC_WHOP_APP_ID,
             apiKey: process.env.WHOP_API_KEY,
-            webhookKey: process.env.WHOP_WEBHOOK_SECRET, // Use raw string
+            webhookKey: process.env.WHOP_WEBHOOK_SECRET,
         });
+        return whopInstance;
     } catch (e) {
-        console.error("Critical: Whop SDK failed to initialize:", e);
+        console.error("Failed to initialize Whop SDK:", e);
         return null;
     }
 };
-
-export const whopsdk = getWhopsdk() as Whop;
